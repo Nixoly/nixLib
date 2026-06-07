@@ -213,18 +213,6 @@ List<Home> homes = db.queryMany(q.sql(), rs -> new Home(
 
 Toolchain Java 21, output bytecode `--release 17`.
 
-## Changelog
-
-### 1.0.6
-
-- Added `dev.nixoly.nixlib.world.WorldThreadAccess` — detects whether block/world
-  API calls are safe on the current thread (Paper/Spigot main thread; Folia/Canvas
-  region thread via Moonrise `TickThread`).
-- Added `dev.nixoly.nixlib.world.CachedBlockRayTrace` — thread-safe solid-block
-  raycast with per-entity cache and entity-scheduler refresh for packet/async
-  callers. Fixes `captureTreeGeneration` / `getCurrentWorldData() is null` errors
-  when plugins raycast from PacketEvents on Canvas and Folia.
-
 ## License
 
 See [LICENSE](LICENSE). Personal and public plugins are fine, modifications
