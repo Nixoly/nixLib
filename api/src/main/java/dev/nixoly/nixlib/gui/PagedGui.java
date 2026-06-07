@@ -1,0 +1,108 @@
+package dev.nixoly.nixlib.gui;
+
+import org.bukkit.inventory.ItemStack;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
+
+public class PagedGui extends Gui {
+
+    private final List<GuiItem> entries = new ArrayList<>();
+    private final List<Integer> contentSlots = new ArrayList<>();
+
+    private int page;
+    private int previousSlot = -1;
+    private int nextSlot = -1;
+    private ItemStack previousItem;
+    private ItemStack nextItem;
+
+    public PagedGui(String title, int rows) {
+        super(title, rows);
+        for (int r = 1; r < rows - 1; r++) {
+            for (int c = 1; c < 8; c++) {
+                contentSlots.add(r * 9 + c);
+            }
+        }
+    }
+
+    public PagedGui contentSlots(int... slots) {
+        contentSlots.clear();
+        Arrays.stream(slots).forEach(contentSlots::add);
+        return this;
+    }
+
+    public PagedGui pagination(int previousSlot, ItemStack previousItem,
+                               int nextSlot, ItemStack nextItem) {
+        this.previousSlot = previousSlot;
+        this.nextSlot = nextSlot;
+        this.previousItem = previousItem;
+        this.nextItem = nextItem;
+        return this;
+    }
+
+    public PagedGui addEntry(ItemStack item) {
+        entries.add(GuiItem.of(item));
+        return this;
+    }
+
+    public PagedGui addEntry(ItemStack item, Consumer<ClickContext> handler) {
+        entries.add(GuiItem.of(item, handler));
+        return this;
+    }
+
+    public int currentPage() {
+        return page;
+    }
+
+    public int totalPages() {
+        if (contentSlots.isEmpty() || entries.isEmpty()) return 1;
+        return (int) Math.ceil(entries.size() / (double) contentSlots.size());
+    }
+
+    public PagedGui open(org.bukkit.entity.Player player, int page) {
+        this.page = Math.max(0, Math.min(page, totalPages() - 1));
+        render();
+        super.open(player);
+        return this;
+    }
+
+    public void goTo(int page) {
+        int target = Math.max(0, Math.min(page, totalPages() - 1));
+        if (target == this.page) return;
+        this.page = target;
+        render();
+    }
+
+    public void nextPage() { goTo(page + 1); }
+
+    public void previousPage() { goTo(page - 1); }
+
+    private void render() {
+        for (int slot : contentSlots) clear(slot);
+
+        int perPage = contentSlots.size();
+        int start = page * perPage;
+        int end = Math.min(start + perPage, entries.size());
+        for (int i = start; i < end; i++) {
+            int slot = contentSlots.get(i - start);
+            setItem(slot, entries.get(i));
+        }
+
+        if (previousSlot >= 0) {
+            if (page > 0) {
+                setItem(previousSlot, previousItem, ctx -> previousPage());
+            } else {
+                clear(previousSlot);
+            }
+        }
+        if (nextSlot >= 0) {
+            if (page < totalPages() - 1) {
+                setItem(nextSlot, nextItem, ctx -> nextPage());
+            } else {
+                clear(nextSlot);
+            }
+        }
+    }
+}
