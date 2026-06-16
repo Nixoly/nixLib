@@ -17,6 +17,8 @@ public class PagedGui extends Gui {
     private int nextSlot = -1;
     private ItemStack previousItem;
     private ItemStack nextItem;
+    private ItemStack previousFiller;
+    private ItemStack nextFiller;
 
     public PagedGui(String title, int rows) {
         super(title, rows);
@@ -39,6 +41,12 @@ public class PagedGui extends Gui {
         this.nextSlot = nextSlot;
         this.previousItem = previousItem;
         this.nextItem = nextItem;
+        return this;
+    }
+
+    public PagedGui paginationFiller(ItemStack previousFiller, ItemStack nextFiller) {
+        this.previousFiller = previousFiller;
+        this.nextFiller = nextFiller;
         return this;
     }
 
@@ -93,6 +101,8 @@ public class PagedGui extends Gui {
         if (previousSlot >= 0) {
             if (page > 0) {
                 setItem(previousSlot, previousItem, ctx -> previousPage());
+            } else if (previousFiller != null) {
+                setItem(previousSlot, previousFiller.clone());
             } else {
                 clear(previousSlot);
             }
@@ -100,6 +110,8 @@ public class PagedGui extends Gui {
         if (nextSlot >= 0) {
             if (page < totalPages() - 1) {
                 setItem(nextSlot, nextItem, ctx -> nextPage());
+            } else if (nextFiller != null) {
+                setItem(nextSlot, nextFiller.clone());
             } else {
                 clear(nextSlot);
             }

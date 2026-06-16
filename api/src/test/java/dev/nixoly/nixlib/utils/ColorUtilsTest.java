@@ -88,6 +88,28 @@ class ColorUtilsTest {
     }
 
     @Test
+    void translateConvertsUnusualLegacyHexToColour() {
+        Component c = ColorUtils.translate("&x&F&F&8&8&0&0orange");
+        TextColor colour = c.color() != null ? c.color() : findFirstColor(c);
+        assertThat(colour).isEqualTo(TextColor.fromHexString("#FF8800"));
+        assertThat(ColorUtils.stripColor(c)).isEqualTo("orange");
+    }
+
+    @Test
+    void translateUnusualLegacyHexIsCaseInsensitive() {
+        Component c = ColorUtils.translate("&X&f&F&8&8&0&0mix");
+        TextColor colour = c.color() != null ? c.color() : findFirstColor(c);
+        assertThat(colour).isEqualTo(TextColor.fromHexString("#FF8800"));
+        assertThat(ColorUtils.stripColor(c)).isEqualTo("mix");
+    }
+
+    @Test
+    void translateHandlesAllThreeFormatsTogether() {
+        Component c = ColorUtils.translate("<red>a</red> &bb &#00FF00c &x&1&2&3&4&5&6d");
+        assertThat(ColorUtils.stripColor(c)).isEqualTo("a b c d");
+    }
+
+    @Test
     void translateNullAndEmptyReturnEmpty() {
         assertThat(ColorUtils.translate(null)).isEqualTo(Component.empty());
         assertThat(ColorUtils.translate("")).isEqualTo(Component.empty());

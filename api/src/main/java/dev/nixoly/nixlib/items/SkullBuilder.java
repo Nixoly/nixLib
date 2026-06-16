@@ -44,15 +44,17 @@ public final class SkullBuilder {
         return this;
     }
 
-    public SkullBuilder texture(String base64) {
+    public SkullBuilder texture(String value) {
         SkullMeta meta = (SkullMeta) skull.getItemMeta();
-        if (meta == null) return this;
+        if (meta == null || value == null || value.isBlank()) {
+            return this;
+        }
+        String trimmed = value.trim();
+        String url = resolveTextureUrl(trimmed);
 
-        try {
-            String decoded = new String(Base64.getDecoder().decode(base64));
-            String url = extractUrl(decoded);
-            applyProfile(meta, url == null ? null : URI.create(url));
-        } catch (IllegalArgumentException ignored) {
+        boolean applied = url != null && applyProfile(meta, safeUri(url));
+        if (!applied) {
+            String base64 = url != null ? encodeUrl(url) : trimmed;
             applyLegacyTexture(meta, base64);
         }
 
@@ -60,10 +62,58 @@ public final class SkullBuilder {
         return this;
     }
 
+    static String resolveTextureUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            return trimmed;
+        }
+        String decoded = tryDecodeBase64(trimmed);
+        if (decoded != null && decoded.contains("\"url\"")) {
+            return extractUrl(decoded);
+        }
+        if (isTextureHash(trimmed)) {
+            return TEXTURE_URL_PREFIX + trimmed;
+        }
+        return null;
+    }
+
+    private static String tryDecodeBase64(String value) {
+        try {
+            return new String(Base64.getDecoder().decode(value), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean isTextureHash(String value) {
+        if (value.length() < 16) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            boolean hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+            if (!hex) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static URI safeUri(String url) {
+        try {
+            return URI.create(url);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
     public SkullBuilder textureUrl(String url) {
         SkullMeta meta = (SkullMeta) skull.getItemMeta();
         if (meta == null) return this;
-        applyProfile(meta, URI.create(url));
+        applyProfile(meta, safeUri(url));
         skull.setItemMeta(meta);
         return this;
     }
@@ -72,16 +122,17 @@ public final class SkullBuilder {
         return skull;
     }
 
-    private void applyProfile(SkullMeta meta, URI textureUri) {
-        if (textureUri == null) return;
-        PlayerProfile profile = Bukkit.createPlayerProfile(UUID.randomUUID(), "nixlib");
-        PlayerTextures textures = profile.getTextures();
+    private boolean applyProfile(SkullMeta meta, URI textureUri) {
+        if (textureUri == null) return false;
         try {
+            PlayerProfile profile = Bukkit.createPlayerProfile(UUID.randomUUID(), "nixlib");
+            PlayerTextures textures = profile.getTextures();
             textures.setSkin(textureUri.toURL());
             profile.setTextures(textures);
             meta.setOwnerProfile(profile);
-        } catch (Exception fallback) {
-            applyLegacyTexture(meta, encodeUrl(textureUri.toString()));
+            return true;
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 
@@ -97,20 +148,56 @@ public final class SkullBuilder {
             propertyMap.getClass().getMethod("put", Object.class, Object.class)
                     .invoke(propertyMap, "textures", property);
 
-            Field profileField = meta.getClass().getDeclaredField("profile");
-            profileField.setAccessible(true);
-            profileField.set(meta, profile);
+            if (!assignProfileField(meta, profile)) {
+                trySetProfileViaSetter(meta, profile);
+            }
         } catch (Throwable ignored) {
-            // legacy path is best-effort
         }
     }
 
-    private static String extractUrl(String decoded) {
+    private static boolean assignProfileField(SkullMeta meta, Object gameProfile) {
+        Class<?> type = meta.getClass();
+        while (type != null) {
+            for (Field field : type.getDeclaredFields()) {
+                if (!field.getName().toLowerCase(java.util.Locale.ROOT).contains("profile")) {
+                    continue;
+                }
+                try {
+                    field.setAccessible(true);
+                    if (field.getType().isAssignableFrom(gameProfile.getClass())) {
+                        field.set(meta, gameProfile);
+                        return true;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            type = type.getSuperclass();
+        }
+        return false;
+    }
+
+    private static void trySetProfileViaSetter(SkullMeta meta, Object gameProfile) {
+        for (var method : meta.getClass().getMethods()) {
+            if (!method.getName().equals("setProfile") || method.getParameterCount() != 1) {
+                continue;
+            }
+            if (method.getParameterTypes()[0].isAssignableFrom(gameProfile.getClass())) {
+                try {
+                    method.setAccessible(true);
+                    method.invoke(meta, gameProfile);
+                    return;
+                } catch (Throwable ignored) {
+                    return;
+                }
+            }
+        }
+    }
+
+    static String extractUrl(String decoded) {
+        if (decoded == null) return null;
         int idx = decoded.indexOf("\"url\"");
         if (idx < 0) return null;
         int start = decoded.indexOf('"', idx + 5);
-        if (start < 0) return null;
-        start = decoded.indexOf('"', start + 1);
         if (start < 0) return null;
         int end = decoded.indexOf('"', start + 1);
         if (end < 0) return null;

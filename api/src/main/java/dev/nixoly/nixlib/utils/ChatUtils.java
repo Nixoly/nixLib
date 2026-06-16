@@ -32,6 +32,25 @@ public final class ChatUtils {
         for (String line : lines) send(target, line);
     }
 
+    public static boolean isDisabled(String message) {
+        return message == null || message.isEmpty();
+    }
+
+    public static void sendIfPresent(CommandSender target, String legacy) {
+        if (target == null || isDisabled(legacy)) return;
+        target.sendMessage(ColorUtils.parse(legacy));
+    }
+
+    public static void sendTranslatedIfPresent(CommandSender target, String message) {
+        if (target == null || isDisabled(message)) return;
+        target.sendMessage(ColorUtils.translate(message));
+    }
+
+    public static void sendTranslatedIfPresent(CommandSender target, List<String> lines) {
+        if (target == null || lines == null) return;
+        for (String line : lines) sendTranslatedIfPresent(target, line);
+    }
+
     public static void sendTranslated(CommandSender target, String message) {
         if (target == null || message == null) return;
         if (message.isBlank()) {
