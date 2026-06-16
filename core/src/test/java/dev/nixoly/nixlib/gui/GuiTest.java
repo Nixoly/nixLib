@@ -8,6 +8,7 @@ import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.AfterEach;
@@ -85,6 +86,51 @@ class GuiTest {
         assertThat(gui.inventory().getItem(10)).isNull();
         assertThat(gui.inventory().getItem(13)).isNull();
         assertThat(gui.inventory().getItem(16)).isNull();
+    }
+
+    @Test
+    void escClosingRunsBackHandler() {
+        AtomicInteger back = new AtomicInteger();
+        Gui gui = new Gui("Back", 1);
+        gui.onBack(p -> back.incrementAndGet());
+
+        PlayerMock player = server.addPlayer();
+        gui.open(player);
+        server.getPluginManager().callEvent(new InventoryCloseEvent(player.getOpenInventory()));
+        server.getScheduler().performTicks(2);
+
+        assertThat(back).hasValue(1);
+    }
+
+    @Test
+    void transitionCloseDoesNotRunBackHandler() {
+        AtomicInteger back = new AtomicInteger();
+        Gui gui = new Gui("Back", 1);
+        gui.onBack(p -> back.incrementAndGet());
+
+        PlayerMock player = server.addPlayer();
+        gui.open(player);
+        GuiNavigation.beginTransition(player.getUniqueId());
+        server.getPluginManager().callEvent(new InventoryCloseEvent(player.getOpenInventory()));
+        GuiNavigation.endTransition(player.getUniqueId());
+        server.getScheduler().performTicks(2);
+
+        assertThat(back).hasValue(0);
+    }
+
+    @Test
+    void suppressedCloseDoesNotRunBackHandler() {
+        AtomicInteger back = new AtomicInteger();
+        Gui gui = new Gui("Back", 1);
+        gui.onBack(p -> back.incrementAndGet());
+
+        PlayerMock player = server.addPlayer();
+        gui.open(player);
+        GuiNavigation.suppressBack(player.getUniqueId());
+        server.getPluginManager().callEvent(new InventoryCloseEvent(player.getOpenInventory()));
+        server.getScheduler().performTicks(2);
+
+        assertThat(back).hasValue(0);
     }
 
     @Test

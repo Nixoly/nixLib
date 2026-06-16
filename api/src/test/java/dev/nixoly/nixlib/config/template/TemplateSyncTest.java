@@ -430,6 +430,37 @@ class TemplateSyncTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void freeformPreservesOperatorKeyOrder() {
+        String template = """
+                items:
+                  reset:
+                    material: PLAYER_HEAD
+                    name: "Reset"
+                config-version: "1.0.0"
+                """;
+        String userYaml = """
+                items:
+                  reset:
+                    material: PLAYER_HEAD
+                    texture: "abc123"
+                    name: "Reset"
+                    glow: true
+                config-version: "1.0.0"
+                """;
+        SyncResult result = TemplateSync.synchronize(template, userYaml,
+                SyncOptions.create().freeform("items"));
+
+        Map<String, Object> items = (Map<String, Object>) result.mergedData().get("items");
+        Map<String, Object> reset = (Map<String, Object>) items.get("reset");
+        assertThat(reset.keySet()).containsExactly("material", "texture", "name", "glow");
+
+        String yaml = result.mergedYaml();
+        assertThat(yaml.indexOf("material")).isLessThan(yaml.indexOf("texture"));
+        assertThat(yaml.indexOf("texture")).isLessThan(yaml.indexOf("glow"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void mergeDuplicateKeysCollectsValuesIntoList() {
         String template = """
                 profiles:

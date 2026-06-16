@@ -35,16 +35,11 @@ public final class SyncOptions {
         return this;
     }
 
-    /** When true (default), the version key is always written as the last root entry. */
     public SyncOptions versionKeyLast(boolean last) {
         this.versionKeyLast = last;
         return this;
     }
 
-    /**
-     * When true, unknown root-level keys are kept even if {@link #dropUnknownKeys(boolean)} is true.
-     * Use for freeform maps such as links.yml entries or item list pages.
-     */
     public SyncOptions freeformRoot(boolean freeform) {
         this.freeformRoot = freeform;
         return this;

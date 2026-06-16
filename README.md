@@ -26,9 +26,9 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.Nixoly.nixLib:api:1.0.0")
-    implementation("com.github.Nixoly.nixLib:core:1.0.0")
-    implementation("com.github.Nixoly.nixLib:folia:1.0.0")
+    implementation("com.github.Nixoly.nixLib:api:1.0.1")
+    implementation("com.github.Nixoly.nixLib:core:1.0.1")
+    implementation("com.github.Nixoly.nixLib:folia:1.0.1")
 }
 ```
 

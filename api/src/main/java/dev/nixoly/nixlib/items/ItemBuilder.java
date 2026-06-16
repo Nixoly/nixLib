@@ -111,6 +111,45 @@ public final class ItemBuilder {
         });
     }
 
+    public ItemBuilder glow(boolean glow) {
+        return glow ? glow() : this;
+    }
+
+    public ItemBuilder unbreakable(boolean unbreakable) {
+        return mutate(meta -> meta.setUnbreakable(unbreakable));
+    }
+
+    public ItemBuilder itemModel(String namespacedKey) {
+        return mutate(meta -> ItemMetaReflect.itemModel(meta, namespacedKey));
+    }
+
+    public ItemBuilder tooltipStyle(String namespacedKey) {
+        return mutate(meta -> ItemMetaReflect.tooltipStyle(meta, namespacedKey));
+    }
+
+    public ItemBuilder hideTooltip(boolean hide) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return this;
+        }
+        boolean applied = ItemMetaReflect.hideTooltip(meta, hide);
+        item.setItemMeta(meta);
+        if (!applied) {
+            ItemStackComponents.hideTooltip(item, hide);
+        }
+        return this;
+    }
+
+    public ItemBuilder color(org.bukkit.Color color) {
+        return mutate(meta -> {
+            if (meta instanceof org.bukkit.inventory.meta.LeatherArmorMeta leather) {
+                leather.setColor(color);
+            } else if (meta instanceof org.bukkit.inventory.meta.PotionMeta potion) {
+                potion.setColor(color);
+            }
+        });
+    }
+
     public ItemBuilder attribute(Attribute attribute, AttributeModifier modifier) {
         return mutate(meta -> meta.addAttributeModifier(attribute, modifier));
     }

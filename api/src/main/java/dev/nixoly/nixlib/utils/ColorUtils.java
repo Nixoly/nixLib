@@ -14,6 +14,7 @@ public final class ColorUtils {
 
     private static final Pattern BUKKIT_HEX = Pattern.compile("&#([A-Fa-f0-9]{6})");
     private static final Pattern AMP_CODE = Pattern.compile("&([0-9a-fk-orA-FK-OR])");
+    private static final Pattern X_HEX = Pattern.compile("(?i)&x(&[0-9a-f]){6}");
 
     private static final MiniMessage MINI = MiniMessage.miniMessage();
 
@@ -101,8 +102,33 @@ public final class ColorUtils {
         return out.toString();
     }
 
+    private static String translateUnusualHex(String input) {
+        if (input.indexOf('x') < 0 && input.indexOf('X') < 0) {
+            return input;
+        }
+        Matcher m = X_HEX.matcher(input);
+        if (!m.find()) {
+            return input;
+        }
+        m.reset();
+        StringBuilder sb = new StringBuilder(input.length());
+        while (m.find()) {
+            StringBuilder hex = new StringBuilder(6);
+            for (int i = 0; i < m.group().length(); i++) {
+                char ch = m.group().charAt(i);
+                if ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+                    hex.append(ch);
+                }
+            }
+            m.appendReplacement(sb, Matcher.quoteReplacement("<#" + hex + ">"));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
+
     private static String legacyToMiniMessage(String input) {
-        String hexed = BUKKIT_HEX.matcher(input).replaceAll("<#$1>");
+        String unusual = translateUnusualHex(input);
+        String hexed = BUKKIT_HEX.matcher(unusual).replaceAll("<#$1>");
         Matcher m = AMP_CODE.matcher(hexed);
         if (!m.find()) return hexed;
         m.reset();

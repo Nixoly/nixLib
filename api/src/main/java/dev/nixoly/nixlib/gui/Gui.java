@@ -26,6 +26,7 @@ public class Gui implements InventoryHolder {
     private Consumer<ClickContext> globalClickHandler;
     private Consumer<InventoryOpenEvent> openHandler;
     private Consumer<InventoryCloseEvent> closeHandler;
+    private Consumer<Player> backHandler;
 
     public Gui(String title, int rows) {
         if (rows < 1 || rows > 6) {
@@ -122,8 +123,22 @@ public class Gui implements InventoryHolder {
         return this;
     }
 
+    public Gui onBack(Consumer<Player> handler) {
+        this.backHandler = handler;
+        return this;
+    }
+
+    Consumer<Player> backHandler() {
+        return backHandler;
+    }
+
     public void open(Player player) {
-        player.openInventory(inventory);
+        GuiNavigation.beginTransition(player.getUniqueId());
+        try {
+            player.openInventory(inventory);
+        } finally {
+            GuiNavigation.endTransition(player.getUniqueId());
+        }
     }
 
     void handleClick(InventoryClickEvent event) {

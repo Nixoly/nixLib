@@ -2,6 +2,7 @@ package dev.nixoly.nixlib.utils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public final class StringUtils {
 
@@ -21,12 +22,12 @@ public final class StringUtils {
 
     public static String capitalize(String s) {
         if (isNullOrEmpty(s)) return s;
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase();
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase(Locale.ROOT);
     }
 
     public static String prettyEnum(Enum<?> value) {
         if (value == null) return "";
-        String[] parts = value.name().toLowerCase().split("_");
+        String[] parts = value.name().toLowerCase(Locale.ROOT).split("_");
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.length; i++) {
             if (i > 0) sb.append(' ');

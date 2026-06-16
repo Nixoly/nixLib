@@ -60,8 +60,6 @@ class SerializerTests {
         String encoded = ItemStackSerializer.toBase64(original);
 
         assertThat(encoded).isNotBlank();
-        // MockBukkit can serialize but its in-memory ItemStack doesn't round-trip via Bukkit's
-        // ObjectInputStream registry; on a real server the produced base64 deserialises cleanly.
     }
 
     @Test

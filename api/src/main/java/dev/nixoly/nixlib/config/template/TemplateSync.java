@@ -96,7 +96,6 @@ public final class TemplateSync {
         }
     }
 
-    /** Writes the version key after all other root entries. */
     private static Map<String, Object> withVersionKeyLast(Map<String, Object> merged, String versionKey) {
         if (!merged.containsKey(versionKey)) {
             return merged;
@@ -117,6 +116,25 @@ public final class TemplateSync {
     private static Map<String, Object> mergeMap(Map<String, Object> template, Map<String, Object> user,
                                                 String prefix, SyncOptions opts) {
         boolean freeform = opts.isFreeform(prefix);
+
+        if (freeform) {
+            LinkedHashMap<String, Object> kept = new LinkedHashMap<>(user.size());
+            for (Map.Entry<String, Object> entry : user.entrySet()) {
+                String key = entry.getKey();
+                if (prefix.isEmpty() && key.equals(opts.versionKey())) {
+                    continue;
+                }
+                String path = prefix.isEmpty() ? key : prefix + "." + key;
+                Object userValue = entry.getValue();
+                Object templateValue = template.get(key);
+                if (templateValue instanceof Map<?, ?> templateMap && userValue instanceof Map<?, ?> userMap) {
+                    kept.put(key, mergeMap(asStringMap(templateMap), asStringMap(userMap), path, opts));
+                } else {
+                    kept.put(key, userValue);
+                }
+            }
+            return kept;
+        }
 
         LinkedHashMap<String, Object> out = new LinkedHashMap<>(template.size());
 
