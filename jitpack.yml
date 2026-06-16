@@ -1,4 +1,4 @@
 jdk:
   - openjdk21
 install:
-  - ./gradlew :api:publishMavenPublicationToMavenLocal :core:publishMavenPublicationToMavenLocal :folia:publishMavenPublicationToMavenLocal -x test
+  - ./gradlew clean :api:publishMavenPublicationToMavenLocal :core:publishMavenPublicationToMavenLocal :folia:publishMavenPublicationToMavenLocal -x test --no-build-cache
