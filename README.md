@@ -139,7 +139,7 @@ cache:
 ```java
 Scheduler sched = NixLib.get().scheduler();
 
-// Safe from packet thread: uses cache, or raycasts inline when already on a safe thread
+// Read is cache-only on every thread: it never raycasts inline
 boolean blockTargeted = CachedBlockRayTrace.solidBlockInReach(player, 5.0);
 
 // Keep cache warm from movement / use packets while gliding
@@ -149,9 +149,13 @@ CachedBlockRayTrace.refreshIfStale(sched, player, 5.0);
 CachedBlockRayTrace.clear(player.getUniqueId());
 ```
 
-When the cache is missing or stale on an unsafe thread, `solidBlockInReach`
-returns `true` (assume block-target) so callers can skip detections instead of
-throwing or false-flagging.
+`solidBlockInReach` never calls `rayTraceBlocks` itself — it only reads the
+per-player cache, so it is free to call from a server, region, or Netty thread.
+The raycast happens exclusively inside `refreshIfStale`, which probes inline on
+a safe thread and otherwise schedules the read onto the owning region/main
+thread (no more than once per 75 ms per entity). When the cache is missing or
+older than 100 ms, `solidBlockInReach` returns `true` (assume block-target) so
+callers can skip detections instead of throwing or false-flagging.
 
 ## GUI
 

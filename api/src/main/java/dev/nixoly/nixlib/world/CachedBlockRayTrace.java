@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class CachedBlockRayTrace {
 
     private static final long FRESH_NANOS = 100_000_000L;
-    private static final long REFRESH_COOLDOWN_NANOS = 25_000_000L;
+    private static final long REFRESH_COOLDOWN_NANOS = 75_000_000L;
 
     private static final Map<UUID, CacheEntry> CACHE = new ConcurrentHashMap<>();
     private static final Map<UUID, AtomicBoolean> REFRESH_PENDING = new ConcurrentHashMap<>();
@@ -28,11 +28,6 @@ public final class CachedBlockRayTrace {
     }
 
     public static boolean solidBlockInReach(@NotNull LivingEntity entity, double reach) {
-        if (WorldThreadAccess.canReadBlocks(entity)) {
-            boolean result = probe(entity, reach);
-            putCache(entity.getUniqueId(), result);
-            return result;
-        }
         CacheEntry entry = CACHE.get(entity.getUniqueId());
         if (entry != null && entry.isFresh(FRESH_NANOS)) {
             return entry.blockInReach;
