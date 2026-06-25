@@ -31,12 +31,6 @@ jobs:
       - name: Build modules
         run: ./gradlew clean :api:jar :core:jar :folia:jar :api:sourcesJar :core:sourcesJar :folia:sourcesJar -x test --no-daemon
 
-      - name: Publish to GitHub Packages
-        run: ./gradlew :api:publishMavenPublicationToGitHubPackagesRepository :core:publishMavenPublicationToGitHubPackagesRepository :folia:publishMavenPublicationToGitHubPackagesRepository -x test --no-daemon
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -62,3 +56,10 @@ jobs:
             ```
             https://maven.pkg.github.com/Nixoly/nixLib
             ```
+
+      - name: Publish to GitHub Packages
+        continue-on-error: true
+        run: ./gradlew :api:publishMavenPublicationToGitHubPackagesRepository :core:publishMavenPublicationToGitHubPackagesRepository :folia:publishMavenPublicationToGitHubPackagesRepository -x test --no-daemon
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
