@@ -19,18 +19,33 @@ back through `ServerCapabilities`.
 
 ## Getting it (Gradle)
 
+GitHub Releases (modular jars — primary):
+
 ```kotlin
 repositories {
     mavenCentral()
-    maven("https://jitpack.io")
+    exclusiveContent {
+        forRepositories(
+            ivy {
+                url = uri("https://github.com/Nixoly/nixLib/releases/download/1.0.3")
+                patternLayout { artifact("[artifact]-[revision].[ext]") }
+                metadataSources { artifact() }
+            }
+        )
+        filter { includeGroup("dev.nixoly.nixLib") }
+    }
 }
 
 dependencies {
-    implementation("com.github.Nixoly.nixLib:api:1.0.2")
-    implementation("com.github.Nixoly.nixLib:core:1.0.2")
-    implementation("com.github.Nixoly.nixLib:folia:1.0.2")
+    implementation("dev.nixoly.nixLib:api:1.0.3")
+    implementation("dev.nixoly.nixLib:core:1.0.3")
+    implementation("dev.nixoly.nixLib:folia:1.0.3")
 }
 ```
+
+Every semver tag push runs `.github/workflows/release.yml` — builds `api`, `core`, `folia` and uploads all jars to GitHub Releases plus GitHub Packages (`https://maven.pkg.github.com/Nixoly/nixLib`).
+
+Local dev: `./gradlew publishAllToMavenLocal` then `mavenLocal()` with the same `dev.nixoly.nixLib:<module>:<version>` coordinates.
 
 Relocate it into your own package when shading so two plugins using nixLib at
 different versions don't fight each other:

@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Semver tag to build and publish
+        required: true
+        default: "1.0.3"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build modules
+        run: ./gradlew clean :api:jar :core:jar :folia:jar :api:sourcesJar :core:sourcesJar :folia:sourcesJar -x test --no-daemon
+
+      - name: Publish to GitHub Packages
+        run: ./gradlew :api:publishMavenPublicationToGitHubPackagesRepository :core:publishMavenPublicationToGitHubPackagesRepository :folia:publishMavenPublicationToGitHubPackagesRepository -x test --no-daemon
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          files: |
+            api/build/libs/api-*.jar
+            core/build/libs/core-*.jar
+            folia/build/libs/folia-*.jar
+          body: |
+            Modular nixLib release.
+
+            Attachments: `api`, `core`, `folia` (+ `-sources` jars).
+
+            Gradle (GitHub Release ivy):
+            ```
+            dev.nixoly.nixLib:api:${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+            dev.nixoly.nixLib:core:${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+            dev.nixoly.nixLib:folia:${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+            ```
+
+            GitHub Packages:
+            ```
+            https://maven.pkg.github.com/Nixoly/nixLib
+            ```

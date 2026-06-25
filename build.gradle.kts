@@ -54,6 +54,17 @@ subprojects {
     publishing {
         repositories {
             mavenLocal()
+            val githubToken = System.getenv("GITHUB_TOKEN")
+            if (!githubToken.isNullOrBlank()) {
+                maven {
+                    name = "GitHubPackages"
+                    url = uri("https://maven.pkg.github.com/Nixoly/nixLib")
+                    credentials {
+                        username = System.getenv("GITHUB_ACTOR") ?: "github-actions[bot]"
+                        password = githubToken
+                    }
+                }
+            }
         }
 
         publications {
@@ -66,6 +77,19 @@ subprojects {
             }
         }
     }
+}
+
+tasks.register("buildReleaseModules") {
+    group = "nixlib"
+    description = "Builds api, core, and folia jars for GitHub Release upload."
+    dependsOn(
+        ":api:jar",
+        ":core:jar",
+        ":folia:jar",
+        ":api:sourcesJar",
+        ":core:sourcesJar",
+        ":folia:sourcesJar",
+    )
 }
 
 tasks.register("publishAllToMavenLocal") {
