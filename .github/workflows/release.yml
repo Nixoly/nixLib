@@ -29,7 +29,7 @@ jobs:
           java-version: "21"
 
       - name: Build modules
-        run: ./gradlew clean :api:jar :core:jar :folia:jar :api:sourcesJar :core:sourcesJar :folia:sourcesJar -x test --no-daemon
+        run: ./gradlew clean :api:jar :core:jar :folia:jar -x test --no-daemon
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

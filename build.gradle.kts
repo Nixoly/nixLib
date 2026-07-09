@@ -86,9 +86,6 @@ tasks.register("buildReleaseModules") {
         ":api:jar",
         ":core:jar",
         ":folia:jar",
-        ":api:sourcesJar",
-        ":core:sourcesJar",
-        ":folia:sourcesJar",
     )
 }
 
