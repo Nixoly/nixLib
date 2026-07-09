@@ -41,21 +41,7 @@ jobs:
             core/build/libs/core-*.jar
             folia/build/libs/folia-*.jar
           body: |
-            Modular nixLib release.
-
-            Attachments: `api`, `core`, `folia` (+ `-sources` jars).
-
-            Gradle (GitHub Release ivy):
-            ```
-            dev.nixoly.nixLib:api:${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-            dev.nixoly.nixLib:core:${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-            dev.nixoly.nixLib:folia:${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-            ```
-
-            GitHub Packages:
-            ```
-            https://maven.pkg.github.com/Nixoly/nixLib
-            ```
+            See the tag commit on GitHub for what changed.
 
       - name: Publish to GitHub Packages
         continue-on-error: true

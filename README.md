@@ -168,9 +168,15 @@ CachedBlockRayTrace.clear(player.getUniqueId());
 per-player cache, so it is free to call from a server, region, or Netty thread.
 The raycast happens exclusively inside `refreshIfStale`, which probes inline on
 a safe thread and otherwise schedules the read onto the owning region/main
-thread (no more than once per 75 ms per entity). When the cache is missing or
-older than 100 ms, `solidBlockInReach` returns `true` (assume block-target) so
-callers can skip detections instead of throwing or false-flagging.
+thread. Each cache entry remembers the eye position and view angles from its
+last probe: while the player keeps looking the same way (under 2 degrees of
+rotation and half a block of movement), no new raycast fires at all, and even
+after the view changes probes are limited to one per 250 ms per entity — on
+every thread, inline included. A stale entry whose view snapshot still matches
+keeps serving its cached answer; when the cache is missing or older than
+300 ms with a changed view, `solidBlockInReach` returns `true` (assume
+block-target) so callers can skip detections instead of throwing or
+false-flagging.
 
 ## GUI
 
