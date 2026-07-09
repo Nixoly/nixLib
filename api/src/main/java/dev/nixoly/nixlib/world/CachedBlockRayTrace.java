@@ -7,7 +7,6 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.util.RayTraceResult;
-import org.bukkit.util.Vector;
 import dev.nixoly.nixlib.scheduler.Scheduler;
 import org.jetbrains.annotations.NotNull;
 
@@ -18,8 +17,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class CachedBlockRayTrace {
 
-    private static final long FRESH_NANOS = 100_000_000L;
-    private static final long REFRESH_COOLDOWN_NANOS = 75_000_000L;
+    private static final long FRESH_NANOS = 300_000_000L;
+    private static final long REFRESH_COOLDOWN_NANOS = 250_000_000L;
+    private static final float VIEW_ANGLE_EPSILON_DEG = 2.0f;
+    private static final double EYE_SHIFT_EPSILON_SQ = 0.25;
 
     private static final Map<UUID, CacheEntry> CACHE = new ConcurrentHashMap<>();
     private static final Map<UUID, AtomicBoolean> REFRESH_PENDING = new ConcurrentHashMap<>();
@@ -29,7 +30,14 @@ public final class CachedBlockRayTrace {
 
     public static boolean solidBlockInReach(@NotNull LivingEntity entity, double reach) {
         CacheEntry entry = CACHE.get(entity.getUniqueId());
-        if (entry != null && entry.isFresh(FRESH_NANOS)) {
+        if (entry == null) {
+            return true;
+        }
+        if (entry.isFresh(FRESH_NANOS)) {
+            return entry.blockInReach;
+        }
+        // A stale entry is still valid while the player keeps looking the same way.
+        if (entry.matchesView(entity.getEyeLocation())) {
             return entry.blockInReach;
         }
         return true;
@@ -40,13 +48,11 @@ public final class CachedBlockRayTrace {
             return;
         }
         UUID uuid = entity.getUniqueId();
-        if (WorldThreadAccess.canReadBlocks(entity)) {
-            putCache(uuid, probe(living, reach));
+        if (!needsProbe(CACHE.get(uuid), living.getEyeLocation(), System.nanoTime())) {
             return;
         }
-        CacheEntry entry = CACHE.get(uuid);
-        long now = System.nanoTime();
-        if (entry != null && entry.isFresh(REFRESH_COOLDOWN_NANOS)) {
+        if (WorldThreadAccess.canReadBlocks(entity)) {
+            probeAndCache(uuid, living, reach);
             return;
         }
         AtomicBoolean pending = REFRESH_PENDING.computeIfAbsent(uuid, ignored -> new AtomicBoolean());
@@ -55,8 +61,9 @@ public final class CachedBlockRayTrace {
         }
         scheduler.runFor(entity, () -> {
             try {
-                if (entity.isValid() && entity instanceof LivingEntity validLiving) {
-                    putCache(uuid, probe(validLiving, reach));
+                if (entity.isValid() && entity instanceof LivingEntity validLiving
+                        && needsProbe(CACHE.get(uuid), validLiving.getEyeLocation(), System.nanoTime())) {
+                    probeAndCache(uuid, validLiving, reach);
                 }
             } finally {
                 pending.set(false);
@@ -69,19 +76,26 @@ public final class CachedBlockRayTrace {
         REFRESH_PENDING.remove(uuid);
     }
 
-    private static void putCache(@NotNull UUID uuid, boolean blockInReach) {
-        CACHE.put(uuid, new CacheEntry(blockInReach, System.nanoTime()));
-    }
-
-    private static boolean probe(@NotNull LivingEntity entity, double reach) {
-        Location eye = entity.getEyeLocation();
-        World world = eye.getWorld();
-        if (world == null) {
+    static boolean needsProbe(CacheEntry entry, @NotNull Location eye, long now) {
+        if (entry == null) {
+            return true;
+        }
+        if (entry.matchesView(eye)) {
             return false;
         }
-        Vector direction = eye.getDirection();
+        return (now - entry.updatedAt) > REFRESH_COOLDOWN_NANOS;
+    }
+
+    private static void probeAndCache(@NotNull UUID uuid, @NotNull LivingEntity entity, double reach) {
+        Location eye = entity.getEyeLocation();
+        World world = eye.getWorld();
+        boolean blockInReach = world != null && rayTraceHitsSolid(world, eye, reach);
+        CACHE.put(uuid, new CacheEntry(blockInReach, System.nanoTime(), eye));
+    }
+
+    private static boolean rayTraceHitsSolid(@NotNull World world, @NotNull Location eye, double reach) {
         try {
-            RayTraceResult hit = world.rayTraceBlocks(eye, direction, reach,
+            RayTraceResult hit = world.rayTraceBlocks(eye, eye.getDirection(), reach,
                     FluidCollisionMode.NEVER, true);
             if (hit == null) {
                 return false;
@@ -93,17 +107,43 @@ public final class CachedBlockRayTrace {
         }
     }
 
-    private static final class CacheEntry {
+    private static float angleDelta(float a, float b) {
+        float delta = Math.abs(a - b) % 360.0f;
+        return delta > 180.0f ? 360.0f - delta : delta;
+    }
+
+    static final class CacheEntry {
         private final boolean blockInReach;
         private final long updatedAt;
+        private final float yaw;
+        private final float pitch;
+        private final double eyeX;
+        private final double eyeY;
+        private final double eyeZ;
 
-        private CacheEntry(boolean blockInReach, long updatedAt) {
+        CacheEntry(boolean blockInReach, long updatedAt, @NotNull Location eye) {
             this.blockInReach = blockInReach;
             this.updatedAt = updatedAt;
+            this.yaw = eye.getYaw();
+            this.pitch = eye.getPitch();
+            this.eyeX = eye.getX();
+            this.eyeY = eye.getY();
+            this.eyeZ = eye.getZ();
         }
 
         private boolean isFresh(long maxAgeNanos) {
             return (System.nanoTime() - updatedAt) <= maxAgeNanos;
+        }
+
+        boolean matchesView(@NotNull Location eye) {
+            if (angleDelta(yaw, eye.getYaw()) >= VIEW_ANGLE_EPSILON_DEG
+                    || Math.abs(pitch - eye.getPitch()) >= VIEW_ANGLE_EPSILON_DEG) {
+                return false;
+            }
+            double dx = eye.getX() - eyeX;
+            double dy = eye.getY() - eyeY;
+            double dz = eye.getZ() - eyeZ;
+            return dx * dx + dy * dy + dz * dz < EYE_SHIFT_EPSILON_SQ;
         }
     }
 }
