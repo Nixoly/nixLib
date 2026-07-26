@@ -9,7 +9,7 @@ on:
       tag:
         description: Semver tag to build and publish
         required: true
-        default: "1.0.3"
+        default: "1.0.5"
 
 permissions:
   contents: write
@@ -41,7 +41,11 @@ jobs:
             core/build/libs/core-*.jar
             folia/build/libs/folia-*.jar
           body: |
-            See the tag commit on GitHub for what changed.
+            Database shutdown no longer holds the server thread or abandons queued work.
+
+            - Async database work drains within a bounded deadline
+            - SQLite uses one worker; MySQL connections use finite network timeouts
+            - Plugins can close a database off-thread with closeAsync
 
       - name: Publish to GitHub Packages
         continue-on-error: true

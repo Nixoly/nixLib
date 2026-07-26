@@ -5,8 +5,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,6 +93,89 @@ class DatabaseTest {
         ).get(2, TimeUnit.SECONDS);
 
         assertThat(names).contains("a");
+    }
+
+    @Test
+    void queryOneAsyncUsesDatabaseExecutor() throws Exception {
+        db.execute("INSERT INTO players VALUES ('async-one', 'one', 7)");
+
+        Optional<Integer> level = db.queryOneAsync(
+                "SELECT level FROM players WHERE uuid = ?",
+                rs -> rs.getInt(1),
+                "async-one"
+        ).get(2, TimeUnit.SECONDS);
+
+        assertThat(level).contains(7);
+    }
+
+    @Test
+    void closeDrainsAcceptedWork() throws Exception {
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        var work = db.runAsync(() -> {
+            started.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        assertThat(started.await(1, TimeUnit.SECONDS)).isTrue();
+        release.countDown();
+
+        assertThat(db.close(Duration.ofSeconds(1))).isTrue();
+        assertThat(work).isCompleted();
+    }
+
+    @Test
+    void closeStopsWaitingAtDeadline() throws Exception {
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        db.runAsync(() -> {
+            started.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        assertThat(started.await(1, TimeUnit.SECONDS)).isTrue();
+
+        long start = System.nanoTime();
+        boolean clean = db.close(Duration.ofMillis(50));
+        long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        release.countDown();
+
+        assertThat(clean).isFalse();
+        assertThat(elapsedMillis).isLessThan(500L);
+    }
+
+    @Test
+    void asyncWorkIsRejectedAfterClose() {
+        db.close();
+
+        assertThat(db.executeAsync("SELECT 1")).isCompletedExceptionally();
+    }
+
+    @Test
+    void closeAsyncDoesNotWaitOnCaller() throws Exception {
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        db.runAsync(() -> {
+            started.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        assertThat(started.await(1, TimeUnit.SECONDS)).isTrue();
+
+        var close = db.closeAsync(Duration.ofSeconds(1));
+        assertThat(close).isNotDone();
+        release.countDown();
+
+        assertThat(close.get(2, TimeUnit.SECONDS)).isTrue();
     }
 
     @Test

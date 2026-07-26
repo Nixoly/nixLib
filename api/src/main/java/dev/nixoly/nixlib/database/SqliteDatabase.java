@@ -27,7 +27,7 @@ public final class SqliteDatabase extends HikariDatabase {
         HikariConfig cfg = new HikariConfig();
         cfg.setJdbcUrl(jdbcUrl);
         cfg.setDriverClassName("org.sqlite.JDBC");
-        cfg.setMaximumPoolSize(4);
+        cfg.setMaximumPoolSize(1);
         cfg.setMinimumIdle(1);
         cfg.setConnectionTestQuery("SELECT 1");
         cfg.setPoolName("nixlib-sqlite");

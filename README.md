@@ -27,7 +27,7 @@ repositories {
     exclusiveContent {
         forRepositories(
             ivy {
-                url = uri("https://github.com/Nixoly/nixLib/releases/download/1.0.3")
+                url = uri("https://github.com/Nixoly/nixLib/releases/download/1.0.5")
                 patternLayout { artifact("[artifact]-[revision].[ext]") }
                 metadataSources { artifact() }
             }
@@ -37,9 +37,9 @@ repositories {
 }
 
 dependencies {
-    implementation("dev.nixoly.nixLib:api:1.0.3")
-    implementation("dev.nixoly.nixLib:core:1.0.3")
-    implementation("dev.nixoly.nixLib:folia:1.0.3")
+    implementation("dev.nixoly.nixLib:api:1.0.5")
+    implementation("dev.nixoly.nixLib:core:1.0.5")
+    implementation("dev.nixoly.nixLib:folia:1.0.5")
 }
 ```
 
@@ -215,6 +215,17 @@ List<Home> homes = db.queryMany(q.sql(), rs -> new Home(
         rs.getDouble("x"), rs.getDouble("y"), rs.getDouble("z")
 ), q.parameters());
 ```
+
+Async work is owned by the database and drained during shutdown. Plugins can start a bounded
+close without holding the server thread:
+
+```java
+db.closeAsync(Duration.ofSeconds(2));
+```
+
+SQLite uses one connection and one worker because writes are serialized by the driver. MySQL
+uses a capped worker pool and finite connect/socket timeouts so an unavailable server cannot
+hold shutdown indefinitely.
 
 ## Other bits
 
