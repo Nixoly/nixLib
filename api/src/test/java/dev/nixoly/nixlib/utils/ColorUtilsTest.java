@@ -125,6 +125,14 @@ class ColorUtilsTest {
         assertThat(ColorUtils.stripColor(components.get(2))).isEqualTo("plain three");
     }
 
+    @Test
+    void repeatedTranslationUsesCachedComponent() {
+        Component first = ColorUtils.translate("<gradient:red:gold>cached menu text</gradient>");
+        Component second = ColorUtils.translate("<gradient:red:gold>cached menu text</gradient>");
+
+        assertThat(second).isSameAs(first);
+    }
+
     private static TextColor findFirstColor(Component component) {
         if (component.color() != null) return component.color();
         for (Component child : component.children()) {

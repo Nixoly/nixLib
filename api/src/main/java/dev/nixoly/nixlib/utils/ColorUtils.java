@@ -7,6 +7,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,6 +18,8 @@ public final class ColorUtils {
     private static final Pattern X_HEX = Pattern.compile("(?i)&x(&[0-9a-f]){6}");
 
     private static final MiniMessage MINI = MiniMessage.miniMessage();
+    private static final int TRANSLATE_CACHE_LIMIT = 4096;
+    private static final ConcurrentHashMap<String, Component> TRANSLATE_CACHE = new ConcurrentHashMap<>();
 
     private static final LegacyComponentSerializer AMP_LEGACY = LegacyComponentSerializer.builder()
             .character('&')
@@ -46,7 +49,12 @@ public final class ColorUtils {
 
     public static Component translate(String input) {
         if (input == null || input.isEmpty()) return Component.empty();
-        return MINI.deserialize(legacyToMiniMessage(input));
+        Component cached = TRANSLATE_CACHE.get(input);
+        if (cached != null) return cached;
+        Component translated = MINI.deserialize(legacyToMiniMessage(input));
+        if (TRANSLATE_CACHE.size() >= TRANSLATE_CACHE_LIMIT) TRANSLATE_CACHE.clear();
+        Component raced = TRANSLATE_CACHE.putIfAbsent(input, translated);
+        return raced == null ? translated : raced;
     }
 
     public static List<Component> parseAll(List<String> lines) {
