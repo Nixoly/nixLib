@@ -13,6 +13,8 @@ public class PagedGui extends Gui {
     private final List<Integer> contentSlots = new ArrayList<>();
 
     private int page;
+    private int entryOffset;
+    private int totalEntries = -1;
     private int previousSlot = -1;
     private int nextSlot = -1;
     private ItemStack previousItem;
@@ -60,13 +62,23 @@ public class PagedGui extends Gui {
         return this;
     }
 
+    public PagedGui entryWindow(int firstEntry, int totalEntries) {
+        if (firstEntry < 0 || totalEntries < firstEntry) {
+            throw new IllegalArgumentException("entry window must fit inside total entries");
+        }
+        this.entryOffset = firstEntry;
+        this.totalEntries = totalEntries;
+        return this;
+    }
+
     public int currentPage() {
         return page;
     }
 
     public int totalPages() {
-        if (contentSlots.isEmpty() || entries.isEmpty()) return 1;
-        return (int) Math.ceil(entries.size() / (double) contentSlots.size());
+        int count = totalEntries >= 0 ? totalEntries : entries.size();
+        if (contentSlots.isEmpty() || count == 0) return 1;
+        return (int) Math.ceil(count / (double) contentSlots.size());
     }
 
     public PagedGui open(org.bukkit.entity.Player player, int page) {
@@ -91,11 +103,13 @@ public class PagedGui extends Gui {
         for (int slot : contentSlots) clear(slot);
 
         int perPage = contentSlots.size();
-        int start = page * perPage;
-        int end = Math.min(start + perPage, entries.size());
-        for (int i = start; i < end; i++) {
-            int slot = contentSlots.get(i - start);
-            setItem(slot, entries.get(i));
+        int start = page * perPage - entryOffset;
+        if (start >= 0 && start < entries.size()) {
+            int end = Math.min(start + perPage, entries.size());
+            for (int i = start; i < end; i++) {
+                int slot = contentSlots.get(i - start);
+                setItem(slot, entries.get(i));
+            }
         }
 
         if (previousSlot >= 0) {

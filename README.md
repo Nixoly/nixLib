@@ -27,7 +27,7 @@ repositories {
     exclusiveContent {
         forRepositories(
             ivy {
-                url = uri("https://github.com/Nixoly/nixLib/releases/download/1.0.5")
+                url = uri("https://github.com/Nixoly/nixLib/releases/download/1.0.6")
                 patternLayout { artifact("[artifact]-[revision].[ext]") }
                 metadataSources { artifact() }
             }
@@ -37,9 +37,9 @@ repositories {
 }
 
 dependencies {
-    implementation("dev.nixoly.nixLib:api:1.0.5")
-    implementation("dev.nixoly.nixLib:core:1.0.5")
-    implementation("dev.nixoly.nixLib:folia:1.0.5")
+    implementation("dev.nixoly.nixLib:api:1.0.6")
+    implementation("dev.nixoly.nixLib:core:1.0.6")
+    implementation("dev.nixoly.nixLib:folia:1.0.6")
 }
 ```
 
@@ -196,6 +196,11 @@ For paginated content there is `PagedGui`. The listener is registered for you
 when you call `NixLib.bootstrap` - no need to remember to add it to your
 `PluginManager`.
 
+Large database-backed menus can build only the visible slice with
+`entryWindow(firstEntry, totalEntries)`. Add that page's entries, then open the
+matching page; `totalPages()` still reflects the full result count without
+allocating an item for every row.
+
 ## Database
 
 Hikari + tiny query builder. SQLite and MySQL are wired up; bring your own
@@ -231,7 +236,8 @@ hold shutdown indefinitely.
 
 - `ColorUtils` - Adventure-only. `parse("&aHi &#ff0000there")` and
   `miniMessage("<gradient:red:gold>nixLib</gradient>")` both return a
-  `Component`. No `ChatColor` anywhere.
+  `Component`. Repeated mixed legacy/MiniMessage translations use a bounded
+  component cache. No `ChatColor` anywhere.
 - `EventBus` - small internal bus for plugin-local events, with `@Subscribe`
   reflection registration. Not a replacement for Bukkit events, just
   convenient for game logic.

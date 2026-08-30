@@ -148,4 +148,21 @@ class GuiTest {
         paged.nextPage();
         assertThat(paged.currentPage()).isEqualTo(1);
     }
+
+    @Test
+    void entryWindowRendersOnlySuppliedPage() {
+        PagedGui paged = new PagedGui("Window", 1);
+        paged.contentSlots(0, 1);
+        paged.entryWindow(2, 5);
+        paged.addEntry(new ItemStack(Material.DIAMOND));
+        paged.addEntry(new ItemStack(Material.EMERALD));
+
+        PlayerMock player = server.addPlayer();
+        paged.open(player, 1);
+
+        assertThat(paged.totalPages()).isEqualTo(3);
+        assertThat(paged.currentPage()).isEqualTo(1);
+        assertThat(paged.inventory().getItem(0).getType()).isEqualTo(Material.DIAMOND);
+        assertThat(paged.inventory().getItem(1).getType()).isEqualTo(Material.EMERALD);
+    }
 }
