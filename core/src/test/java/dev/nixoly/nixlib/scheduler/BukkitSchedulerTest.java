@@ -98,7 +98,6 @@ class BukkitSchedulerTest {
         scheduler.runGlobalLater(() -> {}, 10);
         MockBukkit.getMock().getPluginManager().disablePlugin(plugin);
         scheduler.cancelAll();
-        // Second call must not deadlock
         scheduler.cancelAll();
     }
 
