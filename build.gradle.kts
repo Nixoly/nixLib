@@ -44,6 +44,8 @@ subprojects {
 
     tasks.withType<Test> {
         useJUnitPlatform()
+        maxHeapSize = "2g"
+        jvmArgs("-Duser.language=en", "-Duser.country=US", "-Dfile.encoding=UTF-8")
 
         testLogging {
             events("passed", "failed", "skipped")

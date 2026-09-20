@@ -9,7 +9,7 @@ on:
       tag:
         description: Semver tag to build and publish
         required: true
-        default: "1.0.6"
+        default: "1.0.7"
 
 permissions:
   contents: write
@@ -41,10 +41,11 @@ jobs:
             core/build/libs/core-*.jar
             folia/build/libs/folia-*.jar
           body: |
-            Faster repeated menu rendering with bounded text reuse and visible-page item building.
+            One-shot scheduler tasks no longer accumulate, so long-running plugins keep stable memory and disable instantly.
 
-            - Repeated mixed-format text translations reuse immutable components
-            - Paged menus can build only the visible database-backed entry window
+            - Bukkit and Folia schedulers retain only repeating tasks; completed one-shot tasks are released
+            - cancelAll cancels tasks natively instead of copying the tracked set, so shutdown stays fast
+            - Scheduler tests pin an English locale so MockBukkit tag parsing works on non-English hosts
 
       - name: Publish to GitHub Packages
         continue-on-error: true
