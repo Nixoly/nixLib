@@ -114,4 +114,50 @@ class BukkitSchedulerTest {
         assertThat(t1.isAlive()).isFalse();
         assertThat(t2.isAlive()).isFalse();
     }
+
+    @Test
+    void oneShotTasksAreNotRetained() {
+        Runnable noop = () -> {};
+        for (int i = 0; i < 1_000_000; i++) {
+            scheduler.runGlobal(noop);
+        }
+        assertThat(scheduler.trackedCount()).isZero();
+
+        server.getScheduler().performOneTick();
+        assertThat(scheduler.trackedCount()).isZero();
+
+        long started = System.nanoTime();
+        scheduler.cancelAll();
+        long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
+        assertThat(scheduler.trackedCount()).isZero();
+        assertThat(elapsedMs).isLessThan(1000L);
+    }
+
+    @Test
+    void repeatingTasksAreTrackedUntilCancelled() {
+        ScheduledTask first = scheduler.runGlobalTimer(() -> {}, 1, 20);
+        ScheduledTask second = scheduler.runGlobalTimer(() -> {}, 1, 20);
+        assertThat(scheduler.trackedCount()).isEqualTo(2);
+
+        first.cancel();
+        assertThat(scheduler.trackedCount()).isEqualTo(1);
+        assertThat(first.isCancelled()).isTrue();
+
+        scheduler.cancelAll();
+        assertThat(scheduler.trackedCount()).isZero();
+        assertThat(second.isCancelled()).isTrue();
+    }
+
+    @Test
+    void runForTimerHandleIsTrackedAndCancelled() {
+        AtomicInteger ticks = new AtomicInteger();
+        ScheduledTask handle = scheduler.runForTimer(null, task -> ticks.incrementAndGet(), 1, 1);
+        assertThat(scheduler.trackedCount()).isEqualTo(1);
+
+        server.getScheduler().performOneTick();
+        assertThat(ticks).hasValue(1);
+
+        handle.cancel();
+        assertThat(scheduler.trackedCount()).isZero();
+    }
 }
