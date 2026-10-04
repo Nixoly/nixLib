@@ -1,6 +1,7 @@
 package dev.nixoly.nixlib.menu;
 
 import dev.nixoly.nixlib.gui.Gui;
+import dev.nixoly.nixlib.gui.GuiNavigation;
 import dev.nixoly.nixlib.gui.PagedGui;
 import dev.nixoly.nixlib.utils.ChatUtils;
 import dev.nixoly.nixlib.utils.ColorUtils;
@@ -54,8 +55,8 @@ final class DefaultActions {
         });
 
         registry.register("close", (ctx, arg) -> {
-            dev.nixoly.nixlib.gui.GuiNavigation.suppressBack(ctx.player().getUniqueId());
-            ctx.player().closeInventory();
+            GuiNavigation.suppressBack(ctx.player().getUniqueId());
+            GuiNavigation.close(ctx.player());
         });
         registry.register("refresh", (ctx, arg) -> {
         });

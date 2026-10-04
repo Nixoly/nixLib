@@ -56,7 +56,8 @@ public final class ClickContext {
         return event.getClick().isShiftClick();
     }
 
+    /** Closes the menu on the next tick; see {@link GuiNavigation#close(Player)}. */
     public void close() {
-        player().closeInventory();
+        GuiNavigation.close(player());
     }
 }

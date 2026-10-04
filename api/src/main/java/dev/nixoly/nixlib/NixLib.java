@@ -29,10 +29,15 @@ public final class NixLib {
             throw new IllegalStateException("nixLib already bootstrapped by " + instance.plugin.getName());
         }
         instance = new NixLib(plugin);
-        instance.scheduler.plugin().getLogger().info(
+        // FINE so a shaded copy stays out of the host plugin's console unless someone asks for it.
+        plugin.getLogger().fine(
                 "nixLib started on " + instance.capabilities + " (regionThreaded=" + instance.scheduler.isRegionThreaded() + ")"
         );
         return instance;
+    }
+
+    public static boolean isBootstrapped() {
+        return instance != null;
     }
 
     public static synchronized void shutdown() {

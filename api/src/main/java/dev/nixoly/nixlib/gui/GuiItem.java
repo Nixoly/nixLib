@@ -15,11 +15,11 @@ public final class GuiItem {
     }
 
     public static GuiItem of(ItemStack item) {
-        return new GuiItem(item, ctx -> {});
+        return new GuiItem(item, null);
     }
 
     public static GuiItem of(ItemStack item, Consumer<ClickContext> handler) {
-        return new GuiItem(item, handler == null ? ctx -> {} : handler);
+        return new GuiItem(item, handler);
     }
 
     public ItemStack stack() {
@@ -27,6 +27,10 @@ public final class GuiItem {
     }
 
     public void onClick(ClickContext ctx) {
-        handler.accept(ctx);
+        if (handler != null) handler.accept(ctx);
+    }
+
+    boolean clickable() {
+        return handler != null;
     }
 }

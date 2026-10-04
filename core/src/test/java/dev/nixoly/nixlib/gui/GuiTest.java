@@ -10,11 +10,13 @@ import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,7 +29,7 @@ class GuiTest {
 
     @BeforeEach
     void setUp() {
-        server = MockBukkit.mock();
+        server = MockBukkit.mock(new PaperInventoryServerMock());
         plugin = MockBukkit.createMockPlugin("nixlib");
         GuiManager.register(plugin);
     }
@@ -164,5 +166,138 @@ class GuiTest {
         assertThat(paged.currentPage()).isEqualTo(1);
         assertThat(paged.inventory().getItem(0).getType()).isEqualTo(Material.DIAMOND);
         assertThat(paged.inventory().getItem(1).getType()).isEqualTo(Material.EMERALD);
+    }
+
+    @Test
+    void spamClicksRunTheHandlerOnce() {
+        AtomicInteger hits = new AtomicInteger();
+        Gui gui = new Gui("Spam", 1);
+        gui.setItem(0, new ItemStack(Material.DIAMOND), ctx -> hits.incrementAndGet());
+        PlayerMock player = server.addPlayer();
+        gui.open(player);
+
+        InventoryClickEvent first = click(player, 0, ClickType.LEFT);
+        InventoryClickEvent second = click(player, 0, ClickType.LEFT);
+
+        assertThat(hits).hasValue(1);
+        assertThat(first.isCancelled()).isTrue();
+        assertThat(second.isCancelled()).isTrue();
+    }
+
+    @Test
+    void zeroCooldownHandlesEveryClick() {
+        AtomicInteger hits = new AtomicInteger();
+        Gui gui = new Gui("Fast", 1).clickCooldown(Duration.ZERO);
+        gui.setItem(0, new ItemStack(Material.DIAMOND), ctx -> hits.incrementAndGet());
+        PlayerMock player = server.addPlayer();
+        gui.open(player);
+
+        click(player, 0, ClickType.LEFT);
+        click(player, 0, ClickType.RIGHT);
+
+        assertThat(hits).hasValue(2);
+    }
+
+    @Test
+    void doubleClickDoesNotRepeatTheHandler() {
+        AtomicInteger hits = new AtomicInteger();
+        Gui gui = new Gui("Double", 1).clickCooldown(Duration.ZERO);
+        gui.setItem(0, new ItemStack(Material.DIAMOND), ctx -> hits.incrementAndGet());
+        PlayerMock player = server.addPlayer();
+        gui.open(player);
+
+        click(player, 0, ClickType.LEFT);
+        InventoryClickEvent doubleClick = click(player, 0, ClickType.DOUBLE_CLICK);
+
+        assertThat(hits).hasValue(1);
+        assertThat(doubleClick.isCancelled()).isTrue();
+    }
+
+    @Test
+    void menuOpenedFromAClickWaitsForTheNextTick() {
+        Gui second = new Gui("Second", 1);
+        Gui first = new Gui("First", 1);
+        first.setItem(0, new ItemStack(Material.ARROW), ctx -> second.open(ctx.player()));
+        PlayerMock player = server.addPlayer();
+        first.open(player);
+
+        click(player, 0, ClickType.LEFT);
+        assertThat(player.getOpenInventory().getTopInventory()).isSameAs(first.inventory());
+
+        server.getScheduler().performOneTick();
+        assertThat(player.getOpenInventory().getTopInventory()).isSameAs(second.inventory());
+    }
+
+    @Test
+    void lastMenuRequestedByAClickWins() {
+        Gui skipped = new Gui("Skipped", 1);
+        Gui target = new Gui("Target", 1);
+        Gui start = new Gui("Start", 1);
+        start.setItem(0, new ItemStack(Material.ARROW), ctx -> {
+            ctx.close();
+            skipped.open(ctx.player());
+            target.open(ctx.player());
+        });
+        PlayerMock player = server.addPlayer();
+        start.open(player);
+
+        click(player, 0, ClickType.LEFT);
+        server.getScheduler().performOneTick();
+
+        assertThat(player.getOpenInventory().getTopInventory()).isSameAs(target.inventory());
+    }
+
+    @Test
+    void closeFromAClickWaitsForTheNextTick() {
+        Gui gui = new Gui("Close", 1);
+        gui.setItem(0, new ItemStack(Material.BARRIER), ClickContext::close);
+        PlayerMock player = server.addPlayer();
+        gui.open(player);
+
+        click(player, 0, ClickType.LEFT);
+        assertThat(gui.isViewing(player)).isTrue();
+
+        server.getScheduler().performOneTick();
+        assertThat(gui.isViewing(player)).isFalse();
+    }
+
+    @Test
+    void reopeningTheSameMenuKeepsItOpen() {
+        AtomicInteger opens = new AtomicInteger();
+        Gui gui = new Gui("Same", 1).onOpen(event -> opens.incrementAndGet());
+        PlayerMock player = server.addPlayer();
+
+        gui.open(player);
+        gui.open(player);
+
+        assertThat(opens).hasValue(1);
+    }
+
+    @Test
+    void fromResolvesOnlyMenus() {
+        Gui gui = new Gui("Lookup", 2);
+        PlayerMock player = server.addPlayer();
+
+        assertThat(Gui.from(gui.inventory())).isSameAs(gui);
+        assertThat(Gui.from(player.getInventory())).isNull();
+        assertThat(Gui.from(server.createInventory(null, 9, "plain"))).isNull();
+        assertThat(Gui.from(null)).isNull();
+    }
+
+    @Test
+    void quitForgetsPendingBackSuppression() {
+        PlayerMock player = server.addPlayer();
+        GuiNavigation.suppressBack(player.getUniqueId());
+
+        server.getPluginManager().callEvent(new PlayerQuitEvent(player, "bye"));
+
+        assertThat(GuiNavigation.consumeSuppressBack(player.getUniqueId())).isFalse();
+    }
+
+    private InventoryClickEvent click(PlayerMock player, int slot, ClickType type) {
+        InventoryClickEvent event = new InventoryClickEvent(
+                player.getOpenInventory(), InventoryType.SlotType.CONTAINER, slot, type, InventoryAction.PICKUP_ALL);
+        server.getPluginManager().callEvent(event);
+        return event;
     }
 }

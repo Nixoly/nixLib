@@ -81,6 +81,9 @@ public final class AnvilGui {
     }
 
     public void open(Player player) {
+        if (GuiNavigation.deferIfDispatching(player.getUniqueId(), () -> open(player))) {
+            return;
+        }
         this.player = player;
         this.currentText = initialText;
         this.confirmed = false;
