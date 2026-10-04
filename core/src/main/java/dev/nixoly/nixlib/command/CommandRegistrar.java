@@ -25,7 +25,8 @@ public final class CommandRegistrar {
                     + " was not registered.");
             return false;
         }
-        unregister(plugin, spec.label(), spec.aliases());
+        // syncCommands resends the command tree to every online player, so do it once per register.
+        removeExisting(map, plugin, spec.label(), spec.aliases());
         NixCommand command = new NixCommand(spec);
         boolean primary = map.register(fallbackPrefix(plugin), command);
         if (!primary) {
@@ -42,31 +43,38 @@ public final class CommandRegistrar {
 
     public static void unregister(@NotNull Plugin plugin, @NotNull String label, @NotNull List<String> aliases) {
         CommandMap map = commandMap(plugin);
-        if (map == null) {
-            return;
+        if (map != null && removeExisting(map, plugin, label, aliases)) {
+            syncCommands();
         }
+    }
+
+    private static boolean removeExisting(@NotNull CommandMap map, @NotNull Plugin plugin,
+                                          @NotNull String label, @NotNull List<String> aliases) {
         Map<String, Command> known = knownCommands(map);
         if (known == null) {
-            return;
+            return false;
         }
         String prefix = fallbackPrefix(plugin);
         List<String> labels = new ArrayList<>();
         labels.add(label);
         labels.addAll(aliases);
+        boolean removed = false;
         for (String name : labels) {
             String lower = name.toLowerCase(Locale.ROOT);
-            removeIfOurs(known, lower);
-            removeIfOurs(known, prefix + ":" + lower);
+            removed |= removeIfOurs(known, lower);
+            removed |= removeIfOurs(known, prefix + ":" + lower);
         }
-        syncCommands();
+        return removed;
     }
 
-    private static void removeIfOurs(@NotNull Map<String, Command> known, @NotNull String key) {
+    private static boolean removeIfOurs(@NotNull Map<String, Command> known, @NotNull String key) {
         Command existing = known.get(key);
-        if (existing instanceof NixCommand) {
-            known.remove(key);
-            existing.unregister(null);
+        if (!(existing instanceof NixCommand)) {
+            return false;
         }
+        known.remove(key);
+        existing.unregister(null);
+        return true;
     }
 
     private static String fallbackPrefix(@NotNull Plugin plugin) {

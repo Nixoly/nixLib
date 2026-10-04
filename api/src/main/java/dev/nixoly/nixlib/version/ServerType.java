@@ -16,7 +16,12 @@ public enum ServerType {
         return this == FOLIA || this == CANVAS;
     }
 
+    /** The running server's type. Probed once; a failed class lookup is expensive. */
     public static ServerType detect() {
+        return Detected.TYPE;
+    }
+
+    private static ServerType probe() {
         if (classPresent("io.canvasmc.canvas.Config")) {
             return CANVAS;
         }
@@ -33,6 +38,10 @@ public enum ServerType {
             return BUKKIT;
         }
         return UNKNOWN;
+    }
+
+    private static final class Detected {
+        static final ServerType TYPE = probe();
     }
 
     private static boolean classPresent(String name) {

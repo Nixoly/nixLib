@@ -3,6 +3,7 @@ package dev.nixoly.nixlib.items;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.profile.PlayerProfile;
@@ -16,6 +17,7 @@ import java.util.UUID;
 public final class SkullBuilder {
 
     private static final String TEXTURE_URL_PREFIX = "http://textures.minecraft.net/texture/";
+    private static final boolean PROFILE_API = hasProfileApi();
 
     private final ItemStack skull;
 
@@ -36,12 +38,37 @@ public final class SkullBuilder {
         return this;
     }
 
+    /**
+     * Uses the online player's profile when they are on this server, otherwise a name-only profile
+     * whose skin the server fills in asynchronously. Never blocks on a Mojang lookup, which
+     * {@code Bukkit.getOfflinePlayer(String)} does for unknown names.
+     */
+    @SuppressWarnings("deprecation")
     public SkullBuilder ownerName(String name) {
+        if (name == null || name.isBlank()) return this;
+        String trimmed = name.trim();
+        Player online = Bukkit.getPlayerExact(trimmed);
+        if (online != null) return owner(online);
+
         SkullMeta meta = (SkullMeta) skull.getItemMeta();
-        if (meta == null) return this;
-        meta.setOwningPlayer(Bukkit.getOfflinePlayer(name));
+        if (meta == null || !isPlayerName(trimmed)) return this;
+        if (PROFILE_API) {
+            meta.setOwnerProfile(Bukkit.createPlayerProfile(trimmed));
+        } else {
+            meta.setOwner(trimmed);
+        }
         skull.setItemMeta(meta);
         return this;
+    }
+
+    // Mirrors the vanilla name check; an unresolved placeholder like "%player%" must not reach a profile.
+    static boolean isPlayerName(String name) {
+        if (name.isEmpty() || name.length() > 16) return false;
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c <= ' ' || c >= 127 || c == '%') return false;
+        }
+        return true;
     }
 
     public SkullBuilder texture(String value) {
@@ -190,6 +217,16 @@ public final class SkullBuilder {
                     return;
                 }
             }
+        }
+    }
+
+    // Bukkit.createPlayerProfile(String) arrived in 1.18.1; older servers only have SkullMeta#setOwner.
+    private static boolean hasProfileApi() {
+        try {
+            Bukkit.class.getMethod("createPlayerProfile", String.class);
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
         }
     }
 

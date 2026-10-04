@@ -252,14 +252,13 @@ public final class ConfigItem {
         return Color.fromRGB(clamp(r), clamp(g), clamp(b));
     }
 
+    @SuppressWarnings("deprecation")
     private static ItemStack applySnbt(ItemStack item, String snbt) {
         try {
-            Object unsafe = Bukkit.class.getMethod("getUnsafe").invoke(null);
-            unsafe.getClass().getMethod("modifyItemStack", ItemStack.class, String.class)
-                    .invoke(unsafe, item, snbt);
-        } catch (Throwable ignored) {
+            return Bukkit.getUnsafe().modifyItemStack(item, snbt);
+        } catch (IllegalArgumentException invalidSnbt) {
+            return item;
         }
-        return item;
     }
 
     private static int clamp(int value) {

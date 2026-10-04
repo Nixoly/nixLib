@@ -6,14 +6,30 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class SoundUtils {
 
+    private static final int CACHE_LIMIT = 512;
+    private static final Object MISSING = new Object();
+    private static final Map<String, Object> RESOLVED = new ConcurrentHashMap<>();
+
     private SoundUtils() {}
 
+    /** Resolves a modern key or a legacy enum-style name. Results are cached, so menus can call it per click. */
     public static Sound parseSound(String name) {
         if (name == null || name.isBlank()) return null;
+        Object cached = RESOLVED.get(name);
+        if (cached != null) return cached == MISSING ? null : (Sound) cached;
 
+        Sound sound = resolve(name);
+        if (RESOLVED.size() >= CACHE_LIMIT) RESOLVED.clear();
+        RESOLVED.put(name, sound == null ? MISSING : sound);
+        return sound;
+    }
+
+    private static Sound resolve(String name) {
         String key = name.toLowerCase(Locale.ROOT);
         if (key.startsWith("minecraft:")) {
             key = key.substring("minecraft:".length());

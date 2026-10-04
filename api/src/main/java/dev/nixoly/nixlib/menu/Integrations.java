@@ -1,8 +1,10 @@
 package dev.nixoly.nixlib.menu;
 
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.messaging.Messenger;
 
 import java.io.ByteArrayOutputStream;
@@ -43,14 +45,13 @@ final class Integrations {
     }
 
     static String parsePlaceholders(Player player, String text) {
-        Object provider = papiClass();
-        if (provider == null) {
+        Method setPlaceholders = Hooks.SET_PLACEHOLDERS;
+        if (setPlaceholders == null) {
             Warnings.once("papi", "PlaceholderAPI is not installed; placeholder action skipped.");
             return text;
         }
         try {
-            Method method = ((Class<?>) provider).getMethod("setPlaceholders", Player.class, String.class);
-            Object result = method.invoke(null, player, text);
+            Object result = setPlaceholders.invoke(null, player, text);
             return result == null ? text : result.toString();
         } catch (Throwable t) {
             Warnings.once("papi-error", "PlaceholderAPI parsing failed: " + t.getMessage());
@@ -58,25 +59,15 @@ final class Integrations {
         }
     }
 
-    private static Object papiClass() {
-        try {
-            return Class.forName("me.clip.placeholderapi.PlaceholderAPI");
-        } catch (Throwable t) {
-            return null;
-        }
-    }
-
     static boolean money(Player player, double amount, boolean deposit) {
-        Object economy = economy();
-        if (economy == null) {
+        Method method = deposit ? Hooks.DEPOSIT : Hooks.WITHDRAW;
+        Object economy = provider(Hooks.ECONOMY);
+        if (economy == null || method == null) {
             Warnings.once("vault-economy", "Vault economy not found; money action skipped.");
             return false;
         }
         try {
-            String method = deposit ? "depositPlayer" : "withdrawPlayer";
-            economy.getClass()
-                    .getMethod(method, org.bukkit.OfflinePlayer.class, double.class)
-                    .invoke(economy, player, amount);
+            method.invoke(economy, player, amount);
             return true;
         } catch (Throwable t) {
             Warnings.once("vault-economy-error", "Vault economy action failed: " + t.getMessage());
@@ -85,16 +76,14 @@ final class Integrations {
     }
 
     static boolean permission(Player player, String node, boolean add) {
-        Object permissions = permissions();
-        if (permissions == null) {
+        Method method = add ? Hooks.PERMISSION_ADD : Hooks.PERMISSION_REMOVE;
+        Object permissions = provider(Hooks.PERMISSION);
+        if (permissions == null || method == null) {
             Warnings.once("vault-permission", "Vault permission provider not found; permission action skipped.");
             return false;
         }
         try {
-            String method = add ? "playerAdd" : "playerRemove";
-            permissions.getClass()
-                    .getMethod(method, Player.class, String.class)
-                    .invoke(permissions, player, node);
+            method.invoke(permissions, player, node);
             return true;
         } catch (Throwable t) {
             Warnings.once("vault-permission-error", "Vault permission action failed: " + t.getMessage());
@@ -102,24 +91,44 @@ final class Integrations {
         }
     }
 
-    private static Object economy() {
-        return service("net.milkbowl.vault.economy.Economy");
+    // The provider is looked up per call because Vault services can be swapped while the server runs.
+    private static Object provider(Class<?> service) {
+        if (service == null) {
+            return null;
+        }
+        RegisteredServiceProvider<?> registration = Bukkit.getServicesManager().getRegistration(service);
+        return registration == null ? null : registration.getProvider();
     }
 
-    private static Object permissions() {
-        return service("net.milkbowl.vault.permission.Permission");
-    }
+    // Resolved on first use. A missing plugin costs a ClassNotFoundException, which is too slow to
+    // repeat on every menu click.
+    private static final class Hooks {
+        static final Method SET_PLACEHOLDERS = method(
+                type("me.clip.placeholderapi.PlaceholderAPI"), "setPlaceholders", Player.class, String.class);
+        static final Class<?> ECONOMY = type("net.milkbowl.vault.economy.Economy");
+        static final Class<?> PERMISSION = type("net.milkbowl.vault.permission.Permission");
+        static final Method DEPOSIT = method(ECONOMY, "depositPlayer", OfflinePlayer.class, double.class);
+        static final Method WITHDRAW = method(ECONOMY, "withdrawPlayer", OfflinePlayer.class, double.class);
+        static final Method PERMISSION_ADD = method(PERMISSION, "playerAdd", Player.class, String.class);
+        static final Method PERMISSION_REMOVE = method(PERMISSION, "playerRemove", Player.class, String.class);
 
-    private static Object service(String className) {
-        try {
-            Class<?> type = Class.forName(className);
-            Object registration = Bukkit.getServicesManager().getRegistration(type.asSubclass(Object.class));
-            if (registration == null) {
+        private static Class<?> type(String name) {
+            try {
+                return Class.forName(name);
+            } catch (ClassNotFoundException e) {
                 return null;
             }
-            return registration.getClass().getMethod("getProvider").invoke(registration);
-        } catch (Throwable t) {
-            return null;
+        }
+
+        private static Method method(Class<?> owner, String name, Class<?>... parameters) {
+            if (owner == null) {
+                return null;
+            }
+            try {
+                return owner.getMethod(name, parameters);
+            } catch (NoSuchMethodException e) {
+                return null;
+            }
         }
     }
 }
