@@ -74,6 +74,11 @@ public final class QueryBuilder {
         return this;
     }
 
+    public QueryBuilder groupBy(String expr) {
+        sql.append(" GROUP BY ").append(expr);
+        return this;
+    }
+
     public QueryBuilder orderBy(String expr) {
         sql.append(" ORDER BY ").append(expr);
         return this;
@@ -81,6 +86,11 @@ public final class QueryBuilder {
 
     public QueryBuilder limit(int n) {
         sql.append(" LIMIT ").append(n);
+        return this;
+    }
+
+    public QueryBuilder offset(int n) {
+        sql.append(" OFFSET ").append(n);
         return this;
     }
 

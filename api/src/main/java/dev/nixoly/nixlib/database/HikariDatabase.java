@@ -2,6 +2,7 @@ package dev.nixoly.nixlib.database;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import dev.nixoly.nixlib.NixLib;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -35,20 +36,42 @@ public abstract class HikariDatabase implements Database {
     private final CountDownLatch dataSourceClosed = new CountDownLatch(1);
     private final AtomicReference<CompletableFuture<Boolean>> asyncClose = new AtomicReference<>();
     private final String poolName;
+    private final DatabaseType type;
 
     protected HikariDatabase(HikariConfig config) {
+        this(config, DatabaseType.fromJdbcUrl(config.getJdbcUrl()));
+    }
+
+    /**
+     * @param config pool settings; a missing pool name becomes the bootstrapped plugin's name, or the
+     *               type id when nixLib is not bootstrapped
+     * @param type   the database behind the pool, or null when it is none of the built-in types
+     */
+    protected HikariDatabase(HikariConfig config, DatabaseType type) {
+        String requestedName = config.getPoolName();
+        if (requestedName == null || requestedName.isBlank()) {
+            config.setPoolName(defaultPoolName(type));
+        }
+        this.type = type;
         this.ds = new HikariDataSource(config);
-        this.poolName = config.getPoolName() == null ? "database" : config.getPoolName();
+        this.poolName = config.getPoolName();
         int workerCount = Math.max(1, Math.min(4, config.getMaximumPoolSize()));
         AtomicInteger threadId = new AtomicInteger();
         this.asyncExecutor = Executors.newFixedThreadPool(
                 workerCount,
                 r -> {
-                    Thread t = new Thread(r, "nixlib-db-" + poolName + "-" + threadId.incrementAndGet());
+                    Thread t = new Thread(r, poolName + "-worker-" + threadId.incrementAndGet());
                     t.setDaemon(true);
                     return t;
                 }
         );
+    }
+
+    private static String defaultPoolName(DatabaseType type) {
+        if (NixLib.isBootstrapped()) {
+            return NixLib.get().plugin().getName();
+        }
+        return type == null ? "database" : type.id();
     }
 
     @Override
@@ -59,7 +82,7 @@ public abstract class HikariDatabase implements Database {
     @Override
     public void execute(String sql, Object... params) {
         try (Connection c = borrow(); PreparedStatement ps = c.prepareStatement(sql)) {
-            bind(ps, params);
+            Statements.bind(ps, params);
             ps.execute();
         } catch (SQLException e) {
             throw new DatabaseException("execute failed: " + sql, e);
@@ -69,7 +92,7 @@ public abstract class HikariDatabase implements Database {
     @Override
     public int update(String sql, Object... params) {
         try (Connection c = borrow(); PreparedStatement ps = c.prepareStatement(sql)) {
-            bind(ps, params);
+            Statements.bind(ps, params);
             return ps.executeUpdate();
         } catch (SQLException e) {
             throw new DatabaseException("update failed: " + sql, e);
@@ -79,7 +102,7 @@ public abstract class HikariDatabase implements Database {
     @Override
     public <T> Optional<T> queryOne(String sql, RowMapper<T> mapper, Object... params) {
         try (Connection c = borrow(); PreparedStatement ps = c.prepareStatement(sql)) {
-            bind(ps, params);
+            Statements.bind(ps, params);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.ofNullable(mapper.map(rs)) : Optional.empty();
             }
@@ -92,7 +115,7 @@ public abstract class HikariDatabase implements Database {
     public <T> List<T> queryMany(String sql, RowMapper<T> mapper, Object... params) {
         List<T> out = new ArrayList<>();
         try (Connection c = borrow(); PreparedStatement ps = c.prepareStatement(sql)) {
-            bind(ps, params);
+            Statements.bind(ps, params);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) out.add(mapper.map(rs));
             }
@@ -130,6 +153,52 @@ public abstract class HikariDatabase implements Database {
     }
 
     @Override
+    public CompletableFuture<Integer> updateAsync(String sql, Object... params) {
+        return submitAsync(() -> update(sql, params));
+    }
+
+    @Override
+    public CompletableFuture<Long> insertAsync(String sql, Object... params) {
+        return submitAsync(() -> insert(sql, params));
+    }
+
+    @Override
+    public CompletableFuture<int[]> batchAsync(String sql, List<Object[]> rows) {
+        return submitAsync(() -> batch(sql, rows));
+    }
+
+    @Override
+    public <T> CompletableFuture<T> transactionAsync(TransactionCallback<T> work) {
+        return submitAsync(() -> transaction(work));
+    }
+
+    /**
+     * Inserts a row, or overwrites the non-key columns of the row with the same keys. {@code values}
+     * line up with {@code columns}. The count is whatever the driver reports; MySQL counts an update as 2.
+     *
+     * @throws IllegalStateException when this pool's {@link #type()} is unknown
+     */
+    public int upsert(String table, List<String> keyColumns, List<String> columns, Object... values) {
+        if (type == null) {
+            throw new IllegalStateException("upsert needs a known database type, pool " + poolName + " has none");
+        }
+        if (values.length != columns.size()) {
+            throw new IllegalArgumentException(columns.size() + " columns but " + values.length + " values");
+        }
+        return update(type.upsert(table, keyColumns, columns), values);
+    }
+
+    /** The database behind this pool, or null when its JDBC URL matches none of the built-in types. */
+    public DatabaseType type() {
+        return type;
+    }
+
+    /** The name Hikari logs this pool under. Worker threads are named after it. */
+    public String poolName() {
+        return poolName;
+    }
+
+    @Override
     public void close() {
         close(DEFAULT_CLOSE_TIMEOUT);
     }
@@ -150,7 +219,7 @@ public abstract class HikariDatabase implements Database {
             } catch (Throwable t) {
                 created.completeExceptionally(t);
             }
-        }, "nixlib-db-shutdown");
+        }, poolName + "-shutdown");
         closeThread.setDaemon(true);
         closeThread.start();
         return created;
@@ -235,7 +304,7 @@ public abstract class HikariDatabase implements Database {
             } finally {
                 dataSourceClosed.countDown();
             }
-        }, "nixlib-db-close");
+        }, poolName + "-close");
         closeThread.setDaemon(true);
         closeThread.start();
     }
@@ -267,11 +336,5 @@ public abstract class HikariDatabase implements Database {
             return Long.MAX_VALUE;
         }
         return Math.max(0L, deadline - System.nanoTime());
-    }
-
-    private static void bind(PreparedStatement ps, Object[] params) throws SQLException {
-        for (int i = 0; i < params.length; i++) {
-            ps.setObject(i + 1, params[i]);
-        }
     }
 }

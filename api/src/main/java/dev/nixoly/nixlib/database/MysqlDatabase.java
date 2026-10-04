@@ -5,34 +5,28 @@ import com.zaxxer.hikari.HikariConfig;
 public final class MysqlDatabase extends HikariDatabase {
 
     public MysqlDatabase(String host, int port, String database, String username, String password) {
-        super(build(host, port, database, username, password));
+        this(host, port, database, username, password, null);
+    }
+
+    /** @param poolName what Hikari prints in the console; null falls back to the plugin name */
+    public MysqlDatabase(String host, int port, String database, String username, String password, String poolName) {
+        super(JdbcDatabase.builder(DatabaseType.MYSQL)
+                .host(host)
+                .port(port)
+                .database(database)
+                .credentials(username, password)
+                .poolName(poolName)
+                // This class has always connected without TLS and existing servers are set up for that.
+                .property("useSSL", "false")
+                .hikariConfig(), DatabaseType.MYSQL);
     }
 
     public MysqlDatabase(HikariConfig preset) {
-        super(preset);
+        super(preset, DatabaseType.MYSQL);
     }
 
     @Override
     public String dialect() {
         return "mysql";
-    }
-
-    private static HikariConfig build(String host, int port, String database, String user, String pass) {
-        HikariConfig cfg = new HikariConfig();
-        cfg.setJdbcUrl("jdbc:mysql://" + host + ":" + port + "/" + database
-                + "?useSSL=false&characterEncoding=UTF-8&connectTimeout=5000&socketTimeout=10000&tcpKeepAlive=true");
-        cfg.setUsername(user);
-        cfg.setPassword(pass);
-        cfg.setMaximumPoolSize(10);
-        cfg.setMinimumIdle(1);
-        cfg.setConnectionTimeout(5000L);
-        cfg.setValidationTimeout(2000L);
-        cfg.setIdleTimeout(300_000L);
-        cfg.setPoolName("nixlib-mysql");
-        cfg.addDataSourceProperty("cachePrepStmts", "true");
-        cfg.addDataSourceProperty("prepStmtCacheSize", "250");
-        cfg.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-        cfg.addDataSourceProperty("useServerPrepStmts", "true");
-        return cfg;
     }
 }
