@@ -12,6 +12,22 @@ import java.util.function.Consumer;
 
 public final class BukkitScheduler implements Scheduler {
 
+    private static final ScheduledTask CANCELLED = new ScheduledTask() {
+        @Override
+        public void cancel() {
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return true;
+        }
+
+        @Override
+        public boolean isRunning() {
+            return false;
+        }
+    };
+
     private final Plugin plugin;
     private final Set<BukkitWrapper> tracked = ConcurrentHashMap.newKeySet();
 
@@ -31,63 +47,63 @@ public final class BukkitScheduler implements Scheduler {
 
     @Override
     public ScheduledTask runGlobal(Runnable task) {
-        if (isDisabled()) return cancelledDummy();
+        if (isDisabled()) return CANCELLED;
         try {
             return new BukkitWrapper(Bukkit.getScheduler().runTask(plugin, task));
         } catch (Throwable ignored) {
-            return cancelledDummy();
+            return CANCELLED;
         }
     }
 
     @Override
     public ScheduledTask runGlobalLater(Runnable task, long delayTicks) {
-        if (isDisabled()) return cancelledDummy();
+        if (isDisabled()) return CANCELLED;
         try {
             return new BukkitWrapper(Bukkit.getScheduler().runTaskLater(plugin, task, Math.max(1, delayTicks)));
         } catch (Throwable ignored) {
-            return cancelledDummy();
+            return CANCELLED;
         }
     }
 
     @Override
     public ScheduledTask runGlobalTimer(Runnable task, long delayTicks, long periodTicks) {
-        if (isDisabled()) return cancelledDummy();
+        if (isDisabled()) return CANCELLED;
         try {
             return track(new BukkitWrapper(Bukkit.getScheduler().runTaskTimer(
                     plugin, task, Math.max(1, delayTicks), Math.max(1, periodTicks))));
         } catch (Throwable ignored) {
-            return cancelledDummy();
+            return CANCELLED;
         }
     }
 
     @Override
     public ScheduledTask runAsync(Runnable task) {
-        if (isDisabled()) return cancelledDummy();
+        if (isDisabled()) return CANCELLED;
         try {
             return new BukkitWrapper(Bukkit.getScheduler().runTaskAsynchronously(plugin, task));
         } catch (Throwable ignored) {
-            return cancelledDummy();
+            return CANCELLED;
         }
     }
 
     @Override
     public ScheduledTask runAsyncLater(Runnable task, long delayTicks) {
-        if (isDisabled()) return cancelledDummy();
+        if (isDisabled()) return CANCELLED;
         try {
             return new BukkitWrapper(Bukkit.getScheduler().runTaskLaterAsynchronously(plugin, task, Math.max(1, delayTicks)));
         } catch (Throwable ignored) {
-            return cancelledDummy();
+            return CANCELLED;
         }
     }
 
     @Override
     public ScheduledTask runAsyncTimer(Runnable task, long delayTicks, long periodTicks) {
-        if (isDisabled()) return cancelledDummy();
+        if (isDisabled()) return CANCELLED;
         try {
             return track(new BukkitWrapper(Bukkit.getScheduler().runTaskTimerAsynchronously(
                     plugin, task, Math.max(1, delayTicks), Math.max(1, periodTicks))));
         } catch (Throwable ignored) {
-            return cancelledDummy();
+            return CANCELLED;
         }
     }
 
@@ -118,7 +134,7 @@ public final class BukkitScheduler implements Scheduler {
 
     @Override
     public ScheduledTask runForTimer(Entity entity, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
-        if (isDisabled()) return cancelledDummy();
+        if (isDisabled()) return CANCELLED;
         try {
             BukkitTimerHandle handle = new BukkitTimerHandle();
             BukkitTask bukkitTask = Bukkit.getScheduler().runTaskTimer(
@@ -130,7 +146,7 @@ public final class BukkitScheduler implements Scheduler {
             handle.attach(bukkitTask);
             return track(handle);
         } catch (Throwable ignored) {
-            return cancelledDummy();
+            return CANCELLED;
         }
     }
 
@@ -158,12 +174,6 @@ public final class BukkitScheduler implements Scheduler {
         } catch (Throwable ignored) {
             return true;
         }
-    }
-
-    private ScheduledTask cancelledDummy() {
-        BukkitWrapper dummy = new BukkitWrapper(null);
-        dummy.cancel();
-        return dummy;
     }
 
     private class BukkitWrapper implements ScheduledTask {

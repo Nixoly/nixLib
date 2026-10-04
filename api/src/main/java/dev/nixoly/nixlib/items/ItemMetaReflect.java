@@ -4,13 +4,20 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.lang.reflect.Method;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 final class ItemMetaReflect {
 
     private static final Object MISSING = new Object();
-    private static final Map<String, Object> RESOLVED = new ConcurrentHashMap<>();
+    // Keyed by meta class first so a lookup does not build a "class#method" string per item.
+    private static final ClassValue<Map<String, Object>> RESOLVED = new ClassValue<>() {
+        @Override
+        protected Map<String, Object> computeValue(Class<?> type) {
+            return new ConcurrentHashMap<>();
+        }
+    };
 
     private ItemMetaReflect() {
     }
@@ -18,35 +25,30 @@ final class ItemMetaReflect {
     static void itemModel(ItemMeta meta, String key) {
         NamespacedKey parsed = parseKey(key);
         if (parsed != null) {
-            invoke(meta, "setItemModel", NamespacedKey.class, parsed);
+            invoke(meta, resolve(meta.getClass(), "setItemModel", NamespacedKey.class), parsed);
         }
     }
 
     static void tooltipStyle(ItemMeta meta, String key) {
         NamespacedKey parsed = parseKey(key);
         if (parsed != null) {
-            invoke(meta, "setTooltipStyle", NamespacedKey.class, parsed);
+            invoke(meta, resolve(meta.getClass(), "setTooltipStyle", NamespacedKey.class), parsed);
         }
     }
 
     static boolean hideTooltip(ItemMeta meta, boolean hide) {
         Method setter = resolve(meta.getClass(), "setHideTooltip", boolean.class);
-        if (setter == null) {
+        if (setter == null || !invoke(meta, setter, hide)) {
             return false;
         }
-        try {
-            setter.invoke(meta, hide);
-        } catch (Throwable t) {
-            return false;
-        }
-        Method getter = resolveNoArg(meta.getClass(), "isHideTooltip");
+        Method getter = resolve(meta.getClass(), "isHideTooltip");
         if (getter != null) {
             try {
                 Object current = getter.invoke(meta);
                 if (current instanceof Boolean bool) {
                     return bool == hide;
                 }
-            } catch (Throwable ignored) {
+            } catch (ReflectiveOperationException ignored) {
             }
         }
         return true;
@@ -56,59 +58,33 @@ final class ItemMetaReflect {
         if (key == null || key.isBlank()) {
             return null;
         }
-        try {
-            return NamespacedKey.fromString(key.trim().toLowerCase());
-        } catch (Throwable ignored) {
-            return null;
-        }
+        return NamespacedKey.fromString(key.trim().toLowerCase(Locale.ROOT));
     }
 
-    private static void invoke(ItemMeta meta, String name, Class<?> argType, Object value) {
-        Method method = resolve(meta.getClass(), name, argType);
+    private static boolean invoke(ItemMeta meta, Method method, Object value) {
         if (method == null) {
-            return;
+            return false;
         }
         try {
             method.invoke(meta, value);
-        } catch (Throwable ignored) {
+            return true;
+        } catch (ReflectiveOperationException e) {
+            return false;
         }
     }
 
-    private static Method resolve(Class<?> metaClass, String name, Class<?> argType) {
-        String cacheKey = metaClass.getName() + "#" + name;
-        Object cached = RESOLVED.get(cacheKey);
-        if (cached == MISSING) {
-            return null;
+    // Method names here are unique per signature, so the name alone is a safe cache key.
+    private static Method resolve(Class<?> metaClass, String name, Class<?>... parameters) {
+        Map<String, Object> methods = RESOLVED.get(metaClass);
+        Object cached = methods.get(name);
+        if (cached == null) {
+            try {
+                cached = metaClass.getMethod(name, parameters);
+            } catch (NoSuchMethodException e) {
+                cached = MISSING;
+            }
+            methods.put(name, cached);
         }
-        if (cached instanceof Method method) {
-            return method;
-        }
-        try {
-            Method method = metaClass.getMethod(name, argType);
-            RESOLVED.put(cacheKey, method);
-            return method;
-        } catch (Throwable t) {
-            RESOLVED.put(cacheKey, MISSING);
-            return null;
-        }
-    }
-
-    private static Method resolveNoArg(Class<?> metaClass, String name) {
-        String cacheKey = metaClass.getName() + "#" + name + "()";
-        Object cached = RESOLVED.get(cacheKey);
-        if (cached == MISSING) {
-            return null;
-        }
-        if (cached instanceof Method method) {
-            return method;
-        }
-        try {
-            Method method = metaClass.getMethod(name);
-            RESOLVED.put(cacheKey, method);
-            return method;
-        } catch (Throwable t) {
-            RESOLVED.put(cacheKey, MISSING);
-            return null;
-        }
+        return cached == MISSING ? null : (Method) cached;
     }
 }

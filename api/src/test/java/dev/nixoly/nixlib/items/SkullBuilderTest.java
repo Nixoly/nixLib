@@ -67,4 +67,19 @@ class SkullBuilderTest {
         String encoded = Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
         assertThat(SkullBuilder.resolveTextureUrl(encoded)).isNull();
     }
+
+    @Test
+    void acceptsRealPlayerNames() {
+        assertThat(SkullBuilder.isPlayerName("Nixoly")).isTrue();
+        assertThat(SkullBuilder.isPlayerName(".Bedrock_Name")).isTrue();
+        assertThat(SkullBuilder.isPlayerName("abcdefghijklmnop")).isTrue();
+    }
+
+    @Test
+    void rejectsNamesNoProfileCanCarry() {
+        assertThat(SkullBuilder.isPlayerName("%player%")).isFalse();
+        assertThat(SkullBuilder.isPlayerName("two words")).isFalse();
+        assertThat(SkullBuilder.isPlayerName("abcdefghijklmnopq")).isFalse();
+        assertThat(SkullBuilder.isPlayerName("")).isFalse();
+    }
 }

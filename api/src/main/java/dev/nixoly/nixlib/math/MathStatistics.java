@@ -45,13 +45,7 @@ public final class MathStatistics {
         }
         double[] sorted = Arrays.copyOf(values, length);
         Arrays.sort(sorted);
-        double median = medianOfSortedRange(sorted, 0, length);
-        double[] deviations = new double[length];
-        for (int i = 0; i < length; i++) {
-            deviations[i] = Math.abs(sorted[i] - median);
-        }
-        Arrays.sort(deviations);
-        return medianOfSortedRange(deviations, 0, length);
+        return medianDeviationOfSortedRange(sorted, 0, length);
     }
 
     public static double tightestWindowMedian(double[] values, int length, int windowSize) {
@@ -73,13 +67,7 @@ public final class MathStatistics {
         double[] sorted = Arrays.copyOf(values, length);
         Arrays.sort(sorted);
         int bestStart = findTightestWindowStart(sorted, length, effective);
-        double median = medianOfSortedRange(sorted, bestStart, bestStart + effective);
-        double[] deviations = new double[effective];
-        for (int i = 0; i < effective; i++) {
-            deviations[i] = Math.abs(sorted[bestStart + i] - median);
-        }
-        Arrays.sort(deviations);
-        return medianOfSortedRange(deviations, 0, effective);
+        return medianDeviationOfSortedRange(sorted, bestStart, bestStart + effective);
     }
 
     public static int outlierCount(double[] values, int length, double scale) {
@@ -116,6 +104,31 @@ public final class MathStatistics {
             }
         }
         return bestStart;
+    }
+
+    // In a sorted range the deviations from the median shrink towards the median from the left and grow
+    // away from it on the right, so they come out in order by walking outwards from the median with two
+    // cursors. That gives their median without a second array or a second sort.
+    private static double medianDeviationOfSortedRange(double[] sorted, int from, int toExclusive) {
+        int length = toExclusive - from;
+        double median = medianOfSortedRange(sorted, from, toExclusive);
+        int right = from;
+        while (right < toExclusive && sorted[right] < median) {
+            right++;
+        }
+        int left = right - 1;
+        int target = length / 2;
+        double previous = 0.0;
+        double current = 0.0;
+        for (int taken = 0; taken <= target; taken++) {
+            previous = current;
+            if (left < from || (right < toExclusive && sorted[right] - median <= median - sorted[left])) {
+                current = sorted[right++] - median;
+            } else {
+                current = median - sorted[left--];
+            }
+        }
+        return (length & 1) == 0 ? (previous + current) * 0.5 : current;
     }
 
     private static double medianOfSortedRange(double[] sorted, int from, int toExclusive) {

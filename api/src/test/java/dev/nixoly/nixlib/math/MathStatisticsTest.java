@@ -2,6 +2,9 @@ package dev.nixoly.nixlib.math;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.Random;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MathStatisticsTest {
@@ -94,5 +97,46 @@ class MathStatisticsTest {
 
     private static org.assertj.core.data.Offset<Double> within(double v) {
         return org.assertj.core.data.Offset.offset(v);
+    }
+
+    @Test
+    void madMatchesSortingTheDeviations() {
+        Random random = new Random(7);
+        for (int length = 1; length <= 40; length++) {
+            double[] values = new double[length];
+            for (int i = 0; i < length; i++) {
+                values[i] = random.nextInt(9) == 0 ? values[Math.max(0, i - 1)] : random.nextGaussian() * 10;
+            }
+            assertThat(MathStatistics.medianAbsoluteDeviation(values, length))
+                    .as("length %d", length)
+                    .isCloseTo(sortedDeviationMedian(values, 0, length), within(EPS));
+        }
+    }
+
+    @Test
+    void windowMadMatchesSortingTheDeviations() {
+        double[] values = {9.0, 1.0, 1.2, 0.9, 1.1, 30.0, 1.05, -4.0};
+        double[] sorted = values.clone();
+        Arrays.sort(sorted);
+        // The tightest 5-wide window of the sorted values is 0.9 .. 1.2.
+        assertThat(MathStatistics.tightestWindowMad(values, values.length, 5))
+                .isCloseTo(sortedDeviationMedian(sorted, 1, 6), within(EPS));
+    }
+
+    private static double sortedDeviationMedian(double[] values, int from, int to) {
+        double[] range = Arrays.copyOfRange(values, from, to);
+        Arrays.sort(range);
+        double median = medianOf(range);
+        double[] deviations = new double[range.length];
+        for (int i = 0; i < range.length; i++) {
+            deviations[i] = Math.abs(range[i] - median);
+        }
+        Arrays.sort(deviations);
+        return medianOf(deviations);
+    }
+
+    private static double medianOf(double[] sorted) {
+        int n = sorted.length;
+        return (n & 1) == 0 ? (sorted[n / 2] + sorted[n / 2 - 1]) * 0.5 : sorted[n / 2];
     }
 }
