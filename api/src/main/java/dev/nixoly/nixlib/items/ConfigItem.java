@@ -19,9 +19,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 
 public final class ConfigItem {
+
+    private static final long REUSE_NANOS = 60_000_000_000L;
+    private static final int REUSE_LIMIT = 256;
+    private static final Map<String, Built> RECENT = new ConcurrentHashMap<>();
+
+    private record Built(ItemStack item, long at) {
+    }
 
     private ConfigItem() {
     }
@@ -30,12 +38,69 @@ public final class ConfigItem {
         return build(section, UnaryOperator.identity());
     }
 
-    @SuppressWarnings("unchecked")
     public static ItemStack build(Map<String, Object> section, UnaryOperator<String> text) {
         if (section == null) {
             return new ItemStack(Material.STONE);
         }
+        String key = renderedKey(section, text);
+        long now = System.nanoTime();
+        Built recent = RECENT.get(key);
+        if (recent != null && now - recent.at() < REUSE_NANOS) {
+            return recent.item().clone();
+        }
+        ItemStack item = render(section, text);
+        if (RECENT.size() >= REUSE_LIMIT) {
+            RECENT.clear();
+        }
+        RECENT.put(key, new Built(item.clone(), now));
+        return item;
+    }
 
+    private static String renderedKey(Map<String, Object> section, UnaryOperator<String> text) {
+        StringBuilder key = new StringBuilder(256);
+        appendRendered(key, section, text);
+        Object owner = section.get("skull");
+        if (owner == null) {
+            owner = section.get("head");
+        }
+        if (owner != null) {
+            String name = text.apply(String.valueOf(owner));
+            key.append(name != null && Bukkit.getPlayerExact(name.trim()) != null ? "|on" : "|off");
+        }
+        return key.toString();
+    }
+
+    private static void appendRendered(StringBuilder key, Object value, UnaryOperator<String> text) {
+        if (value instanceof Map<?, ?> map) {
+            key.append('{');
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                appendText(key, String.valueOf(entry.getKey()));
+                appendRendered(key, entry.getValue(), text);
+            }
+            key.append('}');
+        } else if (value instanceof List<?> list) {
+            key.append('[');
+            for (Object item : list) {
+                appendRendered(key, item, text);
+            }
+            key.append(']');
+        } else if (value instanceof String string) {
+            appendText(key, text.apply(string));
+        } else {
+            appendText(key, String.valueOf(value));
+        }
+    }
+
+    private static void appendText(StringBuilder key, String value) {
+        if (value == null) {
+            key.append("-1:");
+            return;
+        }
+        key.append(value.length()).append(':').append(value);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ItemStack render(Map<String, Object> section, UnaryOperator<String> text) {
         Material material = resolveMaterial(asString(section.get("material")));
         ItemStack item = createBase(section, material, text);
 

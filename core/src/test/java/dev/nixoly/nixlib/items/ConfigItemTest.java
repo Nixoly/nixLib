@@ -1,6 +1,8 @@
 package dev.nixoly.nixlib.items;
 
 import be.seeseemelk.mockbukkit.MockBukkit;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
@@ -10,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -48,5 +51,34 @@ class ConfigItemTest {
 
         assertThat(item.getType()).isEqualTo(Material.PAPER);
         assertThat(item.getItemMeta().getItemFlags()).contains(ItemFlag.HIDE_ATTRIBUTES);
+    }
+
+    @Test
+    void reopenedSectionGetsItsOwnStack() {
+        Map<String, Object> section = Map.of("material", "ENDER_PEARL", "name", "Teleport", "lore", List.of("to %player%"));
+        UnaryOperator<String> text = line -> line.replace("%player%", "Nixoly");
+
+        ItemStack first = ConfigItem.build(section, text);
+        first.setAmount(5);
+        ItemStack second = ConfigItem.build(section, text);
+
+        assertThat(second).isNotSameAs(first);
+        assertThat(second.getAmount()).isEqualTo(1);
+        assertThat(plain(second.getItemMeta().lore().get(0))).isEqualTo("to Nixoly");
+    }
+
+    @Test
+    void changedPlaceholderRendersAgain() {
+        Map<String, Object> section = Map.of("material", "PAPER", "name", "Ping %ping%");
+
+        ItemStack low = ConfigItem.build(section, line -> line.replace("%ping%", "20"));
+        ItemStack high = ConfigItem.build(section, line -> line.replace("%ping%", "180"));
+
+        assertThat(plain(low.getItemMeta().displayName())).isEqualTo("Ping 20");
+        assertThat(plain(high.getItemMeta().displayName())).isEqualTo("Ping 180");
+    }
+
+    private static String plain(Component component) {
+        return PlainTextComponentSerializer.plainText().serialize(component);
     }
 }
