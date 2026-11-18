@@ -9,7 +9,7 @@ on:
       tag:
         description: Semver tag to build and publish
         required: true
-        default: "1.1.0"
+        default: "1.1.1"
 
 permissions:
   contents: write
@@ -41,15 +41,10 @@ jobs:
             core/build/libs/core-*.jar
             folia/build/libs/folia-*.jar
           body: |
-            Menus stay in sync with the client after they close, spam clicking costs the server almost nothing, and the database layer covers more databases under the plugin's own name.
+            Reopening a menu is cheaper, because items that look the same as last time are copied instead of built again.
 
-            - Opening or closing a menu from a click handler waits for the next tick, and the player's inventory is resent once a menu closes
-            - One handled click per 150 ms per player; a double click no longer runs a button twice
-            - Menu listeners no longer copy block states on every chest click, and player heads no longer block on Mojang lookups
-            - New database builder for SQLite, H2, MySQL, MariaDB, PostgreSQL and SQL Server, also readable from config.yml
-            - Transactions, batches, generated keys and upserts on every database
-            - Pool and worker names come from the plugin, so the console no longer shows nixlib-sqlite
-            - Colour, sound and statistics helpers do less work per call
+            - Config items that render to the same text within a minute are reused, so only items whose placeholders changed are rebuilt
+            - Every caller still gets its own copy of the stack
 
       - name: Publish to GitHub Packages
         continue-on-error: true
