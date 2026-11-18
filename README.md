@@ -208,6 +208,9 @@ A few things happen for you so menus stay cheap and keep the client in sync:
   `gui.clickCooldown(Duration.ofMillis(...))`, `Duration.ZERO` turns it off.
 - `Gui.from(inventory)` tells you whether an inventory is a menu without the block state copy
   Paper's `getHolder()` makes, so it is safe in listeners that see every chest click.
+- `ConfigItem.build` reuses an item built in the last minute when the section renders to the same
+  text, so reopening a menu only rebuilds the items whose placeholders changed. You always get your
+  own copy of the stack.
 
 Large database-backed menus can build only the visible slice with
 `entryWindow(firstEntry, totalEntries)`. Add that page's entries, then open the
