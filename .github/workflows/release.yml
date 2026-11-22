@@ -41,10 +41,8 @@ jobs:
             core/build/libs/core-*.jar
             folia/build/libs/folia-*.jar
           body: |
-            Reopening a menu is cheaper, because items that look the same as last time are copied instead of built again.
-
-            - Config items that render to the same text within a minute are reused, so only items whose placeholders changed are rebuilt
-            - Every caller still gets its own copy of the stack
+            - Menu items that render the same text are reused when a menu is reopened instead of being rebuilt
+            - Each caller still gets its own item copy
 
       - name: Publish to GitHub Packages
         continue-on-error: true
