@@ -27,7 +27,7 @@ repositories {
     exclusiveContent {
         forRepositories(
             ivy {
-                url = uri("https://github.com/Nixoly/nixLib/releases/download/1.1.1")
+                url = uri("https://github.com/Nixoly/nixLib/releases/download/1.1.2")
                 patternLayout { artifact("[artifact]-[revision].[ext]") }
                 metadataSources { artifact() }
             }
@@ -37,9 +37,9 @@ repositories {
 }
 
 dependencies {
-    implementation("dev.nixoly.nixLib:api:1.1.1")
-    implementation("dev.nixoly.nixLib:core:1.1.1")
-    implementation("dev.nixoly.nixLib:folia:1.1.1")
+    implementation("dev.nixoly.nixLib:api:1.1.2")
+    implementation("dev.nixoly.nixLib:core:1.1.2")
+    implementation("dev.nixoly.nixLib:folia:1.1.2")
 }
 ```
 

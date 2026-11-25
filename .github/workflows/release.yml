@@ -9,7 +9,7 @@ on:
       tag:
         description: Semver tag to build and publish
         required: true
-        default: "1.1.1"
+        default: "1.1.2"
 
 permissions:
   contents: write
@@ -41,8 +41,8 @@ jobs:
             core/build/libs/core-*.jar
             folia/build/libs/folia-*.jar
           body: |
-            - Menu items that render the same text are reused when a menu is reopened instead of being rebuilt
-            - Each caller still gets its own item copy
+            - Fix menus and anvil menus failing to open on Paper 1.21 and newer
+            - Works on older servers as before
 
       - name: Publish to GitHub Packages
         continue-on-error: true
