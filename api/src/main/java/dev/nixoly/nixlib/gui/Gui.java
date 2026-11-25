@@ -184,7 +184,7 @@ public class Gui implements InventoryHolder {
     }
 
     private void openNow(Player player) {
-        if (!player.isOnline() || player.getOpenInventory().getTopInventory() == inventory) {
+        if (!player.isOnline() || InventoryViews.topInventory(player) == inventory) {
             return;
         }
         UUID playerId = player.getUniqueId();

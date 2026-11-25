@@ -50,9 +50,9 @@ public final class GuiNavigation {
      * inventory out of sync.
      */
     public static void close(Player player) {
-        Inventory top = player.getOpenInventory().getTopInventory();
+        Inventory top = InventoryViews.topInventory(player);
         Runnable close = () -> {
-            if (player.getOpenInventory().getTopInventory() == top) {
+            if (InventoryViews.topInventory(player) == top) {
                 player.closeInventory();
             }
         };

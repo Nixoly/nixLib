@@ -95,7 +95,7 @@ public final class AnvilGui {
         } finally {
             GuiNavigation.endTransition(player.getUniqueId());
         }
-        if (view == null || !(view.getTopInventory() instanceof AnvilInventory anvil)) {
+        if (view == null || !(InventoryViews.topInventory(view) instanceof AnvilInventory anvil)) {
             return;
         }
         this.inventory = anvil;
@@ -186,7 +186,7 @@ public final class AnvilGui {
 
     private static void applyTitle(InventoryView view, String title) {
         try {
-            view.setTitle(title);
+            InventoryViews.setTitle(view, title);
         } catch (Throwable ignored) {
         }
     }

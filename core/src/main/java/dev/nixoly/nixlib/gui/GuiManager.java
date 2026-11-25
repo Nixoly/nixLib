@@ -88,7 +88,7 @@ public final class GuiManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     public void onPrepareAnvil(PrepareAnvilEvent event) {
-        AnvilGui anvil = AnvilGui.active(event.getView().getPlayer().getUniqueId());
+        AnvilGui anvil = AnvilGui.active(InventoryViews.player(event.getView()).getUniqueId());
         if (anvil != null && anvil.matches(event.getInventory())) {
             anvil.handlePrepare(event);
         }
